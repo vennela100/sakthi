@@ -1,0 +1,10 @@
+// Temporary build-env workaround (Windows MAX_PATH + OneDrive/subst Metro SHA-1).
+// The JS bundle is supplied manually at app/src/main/assets/index.android.bundle,
+// so skip Gradle's own JS bundling task for the release variant.
+gradle.taskGraph.whenReady { graph ->
+    graph.allTasks.each { t ->
+        if (t.name == 'createBundleReleaseJsAndAssets') {
+            t.enabled = false
+        }
+    }
+}

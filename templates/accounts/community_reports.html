@@ -1,0 +1,431 @@
+{% extends 'base.html' %}
+
+{% block title %}Community Reports — Shakthi{% endblock %}
+
+{% block extra_css %}
+<style>
+    .cr-container {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 0 20px 3rem;
+    }
+    .cr-header {
+        text-align: center;
+        padding: 2rem 0;
+    }
+    .cr-header h1 {
+        font-weight: 700;
+        font-size: 1.75rem;
+        letter-spacing: -0.02em;
+        margin-bottom: 0.5rem;
+        color: var(--text-main);
+    }
+    .cr-header p {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+    }
+
+
+
+    /* Map */
+    #reports-map {
+        height: 320px;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--card-border);
+        margin-bottom: 2rem;
+        box-shadow: var(--notion-shadow);
+        z-index: 1;
+    }
+
+    /* Tab Switcher */
+    .cr-tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+        background: #f5f5f5;
+        border-radius: 10px;
+        padding: 4px;
+    }
+    .cr-tab {
+        flex: 1;
+        padding: 0.6rem 1rem;
+        text-align: center;
+        font-size: 0.85rem;
+        font-weight: 600;
+        border-radius: 8px;
+        cursor: pointer;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        transition: all 0.2s;
+    }
+    .cr-tab.active {
+        background: white;
+        color: var(--text-main);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    /* Panels */
+    .cr-panel { display: none; }
+    .cr-panel.active { display: block; }
+
+    /* Submit Card */
+    .report-card {
+        margin-bottom: 2.5rem;
+    }
+    .report-card h2 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--text-main);
+    }
+
+    /* Location detect button */
+    .detect-loc-btn {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        border: 1px solid var(--card-border);
+        border-radius: 6px;
+        background: white;
+        color: var(--primary);
+        cursor: pointer;
+        transition: all 0.15s;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+    .detect-loc-btn:hover { background: #f5f5f5; }
+
+    /* Reports List */
+    .report-item {
+        display: flex;
+        gap: 1.25rem;
+        padding: 1.25rem;
+        background: white;
+        border: 1px solid var(--card-border);
+        border-radius: var(--radius-md);
+        margin-bottom: 1rem;
+        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: var(--notion-shadow);
+        animation: fadeIn 0.4s ease-out both;
+        animation-delay: var(--delay);
+        cursor: pointer;
+    }
+    .report-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+    .report-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+    .report-icon.harassment { background: #fce8e6; color: #d93025; }
+    .report-icon.suspicious_activity { background: #fef7e0; color: #f29900; }
+    .report-icon.dark_area { background: #fce8e6; color: #d93025; }
+
+    .report-content { flex: 1; }
+    .report-title { font-weight: 600; font-size: 1.05rem; color: var(--text-main); }
+    .report-loc { font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem; margin-top: 0.2rem; }
+    .report-desc { font-size: 0.9rem; color: var(--text-main); margin-top: 0.75rem; line-height: 1.4; }
+    
+    .report-meta { font-size: 0.75rem; color: var(--text-muted); text-align: right; min-width: 80px; }
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cr-container">
+    <div class="mb-4">
+        <a href="{% url 'home' %}" class="text-primary-light text-decoration-none small fw-bold">
+            <i class="bi bi-chevron-left me-1"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <div class="cr-header">
+        <h1>Community Reports</h1>
+        <p>Stay informed about your neighborhood safety</p>
+    </div>
+
+
+
+    <!-- Map with report markers -->
+    <div id="reports-map"></div>
+
+    <!-- Tab Switcher -->
+    <div class="cr-tabs">
+        <button class="cr-tab active" onclick="switchTab('list')">
+            <i class="bi bi-list-ul me-1"></i> Reports
+        </button>
+        <button class="cr-tab" onclick="switchTab('submit')">
+            <i class="bi bi-plus-circle me-1"></i> Submit Report
+        </button>
+    </div>
+
+    <!-- Submit Report Panel -->
+    <div class="cr-panel" id="panel-submit">
+        <div class="card-premium report-card p-4">
+            <h2><i class="bi bi-megaphone-fill text-warning"></i> Submit Safety Report</h2>
+            <form method="post" id="report-form">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label">Type of Issue</label>
+                    {{ form.report_type }}
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Severity</label>
+                    {{ form.severity }}
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label mb-0">Location</label>
+                        <button type="button" class="detect-loc-btn" onclick="detectLocation()">
+                            <i class="bi bi-crosshair"></i> Use my location
+                        </button>
+                    </div>
+                    {{ form.location }}
+                    {{ form.latitude }}
+                    {{ form.longitude }}
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Description (Optional)</label>
+                    {{ form.description }}
+                </div>
+                <button type="submit" class="btn-premium btn-premium-primary">
+                    Submit Report <i class="bi bi-send-fill ms-2"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Reports List Panel -->
+    <div class="cr-panel active" id="panel-list">
+        <div class="reports-feed">
+            <h5 class="mb-4 d-flex align-items-center justify-content-between">
+                <span>Recent Activity</span>
+                <span class="badge bg-soft text-primary-light">{{ reports|length }} Reports</span>
+            </h5>
+
+            {% if reports %}
+                {% for report in reports %}
+                    <div class="report-item" 
+                         style="--delay: {{ forloop.counter0 }}00ms;"
+                         {% if report.latitude and report.longitude %}
+                         onclick="focusReport({{ report.latitude }}, {{ report.longitude }})"
+                         {% endif %}>
+                        <div class="report-icon {{ report.report_type }}">
+                            {% if report.report_type == 'harassment' %}
+                                <i class="bi bi-exclamation-octagon-fill"></i>
+                            {% elif report.report_type == 'suspicious_activity' %}
+                                <i class="bi bi-eye-fill"></i>
+                            {% elif report.report_type == 'dark_area' %}
+                                <i class="bi bi-moon-fill"></i>
+                            {% endif %}
+                        </div>
+                        <div class="report-content">
+                            <div class="report-title">{{ report.get_report_type_display }}</div>
+                            <div class="report-loc">
+                                <i class="bi bi-geo-alt-fill"></i> {{ report.location }}
+                                {% if report.latitude and report.longitude %}
+                                    <i class="bi bi-pin-map-fill text-primary ms-1" style="font-size: 0.7rem;" title="GPS verified"></i>
+                                {% endif %}
+                            </div>
+                            {% if report.description %}
+                                <div class="report-desc">{{ report.description }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="report-meta">
+                            <div>{{ report.timestamp|timesince }} ago</div>
+                            <div class="mt-1">by {{ report.user.first_name|default:report.user.username }}</div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="p-5 text-center card-premium" style="background: transparent; border: 1px dashed var(--card-border); box-shadow: none;">
+                    <i class="bi bi-shield-check text-muted mb-3" style="font-size: 3rem;"></i>
+                    <p class="text-muted">No reports in your area yet.<br>Be the first to help the community.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Google Maps Platform -->
+<script src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}&libraries=places,geometry,marker&v=weekly" defer></script>
+<script>
+    let map;
+
+
+    // Report type colors
+    const REPORT_COLORS = {
+        'harassment': '#d93025',
+        'suspicious_activity': '#f29900',
+        'dark_area': '#d93025'
+    };
+
+    // ── Tab Switching ───────────────────────────────────────────────────
+    function switchTab(tab) {
+        document.querySelectorAll('.cr-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.cr-panel').forEach(p => p.classList.remove('active'));
+
+        if (tab === 'submit') {
+            document.querySelectorAll('.cr-tab')[1].classList.add('active');
+            document.getElementById('panel-submit').classList.add('active');
+        } else {
+            document.querySelectorAll('.cr-tab')[0].classList.add('active');
+            document.getElementById('panel-list').classList.add('active');
+        }
+    }
+
+    // ── Initialize Map ──────────────────────────────────────────────────
+    async function initReportsMap() {
+        map = new google.maps.Map(document.getElementById('reports-map'), {
+            center: { lat: 17.3850, lng: 78.4867 },
+            zoom: 12,
+            mapId: 'DEMO_MAP_ID',
+            disableDefaultUI: false,
+        });
+
+        // Hide overlay once map initializes
+        document.getElementById('loading-overlay').classList.add('hidden');
+
+        try {
+            const response = await fetch('/api/reports/');
+            const data = await response.json();
+            
+            const reports = data.reports || [];
+            if (reports.length === 0) {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(pos => {
+                        map.panTo({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                        map.setZoom(14);
+                    });
+                }
+                return;
+            }
+
+            const bounds = new google.maps.LatLngBounds();
+
+            reports.forEach(r => {
+                let color = '#f29900'; 
+                if (r.severity === 'high') color = '#cc0000'; 
+                else if (r.severity === 'medium') color = '#ff8800'; 
+                else if (r.severity === 'low') color = '#ffcc00'; 
+
+                const markerPos = { lat: r.lat, lng: r.lng };
+                
+                const severityDisplay = r.severity ? r.severity.toUpperCase() : 'UNKNOWN';
+                const popupContent = `
+                    <div style="min-width: 180px; font-family: inherit; padding: 10px;">
+                        <strong style="color: ${color}; display: block; margin-bottom: 5px;">
+                            ${severityDisplay} DANGER - ${r.type_display}
+                        </strong>
+                        <div style="color: #666; font-size: 13px; margin-bottom: 8px;">
+                            <i class="bi bi-geo-alt-fill"></i> ${r.location}
+                        </div>
+                        ${r.description ? '<p style="margin: 6px 0; font-size: 13px; color: #444;">' + r.description + '</p>' : ''}
+                        <hr style="margin: 10px 0; border: 0; border-top: 1px solid #eee;">
+                        <div style="color: #999; font-size: 11px;">
+                            ${r.time} ago • by ${r.user}
+                        </div>
+                    </div>
+                `;
+
+                const infoWindow = new google.maps.InfoWindow({ content: popupContent });
+                
+                // Add a more visible marker
+                const marker = new google.maps.Marker({
+                    position: markerPos,
+                    map: map,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        fillColor: color,
+                        fillOpacity: 1,
+                        strokeColor: '#FFFFFF',
+                        strokeWeight: 2,
+                        scale: 10 // radius in pixels
+                    },
+                    title: `${severityDisplay}: ${r.type_display}`
+                });
+
+                // Also add a larger translucent circle for zone awareness
+                new google.maps.Circle({
+                    strokeColor: color,
+                    strokeOpacity: 0.3,
+                    strokeWeight: 1,
+                    fillColor: color,
+                    fillOpacity: 0.1,
+                    map,
+                    center: markerPos,
+                    radius: 200 // 200 meters visibility
+                });
+
+                marker.addListener('click', () => {
+                    infoWindow.open(map, marker);
+                });
+
+                bounds.extend(markerPos);
+            });
+
+            map.fitBounds(bounds);
+        } catch (error) {
+            console.error('Error fetching reports:', error);
+        }
+    }
+
+    // ── Focus on a specific report ──────────────────────────────────────
+    function focusReport(lat, lng) {
+        if (!map) return;
+        map.panTo({ lat, lng });
+        map.setZoom(17);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ── Auto-detect location (Google Geocoding API) ─────────────────────
+    function detectLocation() {
+        if (!navigator.geolocation) {
+            alert('Geolocation not supported by your browser');
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            pos => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                document.getElementById('id_latitude').value = lat;
+                document.getElementById('id_longitude').value = lng;
+
+                const geocoder = new google.maps.Geocoder();
+                geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+                    if (status === "OK" && results[0]) {
+                        const short = results[0].formatted_address.split(',').slice(0, 3).join(', ');
+                        document.getElementById('id_location').value = short;
+                    } else {
+                        document.getElementById('id_location').value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                    }
+                });
+            },
+            () => alert('Could not get your location. Please enter it manually.')
+        );
+    }
+
+    // Use interval to ensure Google Maps is loaded
+    let mapsInitInterval = setInterval(() => {
+        if(typeof google !== 'undefined' && typeof google.maps !== 'undefined') {
+            clearInterval(mapsInitInterval);
+            initReportsMap();
+        }
+    }, 100);
+</script>
+{% endblock %}

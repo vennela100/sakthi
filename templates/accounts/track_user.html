@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}Live Tracking — Sakthi Safety{% endblock %}
+
+{% block extra_css %}
+<style>
+    .track-container {
+        height: calc(100vh - 80px);
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background-color: #f8f9fa;
+    }
+    .track-map-wrapper {
+        flex: 1;
+        position: relative;
+        width: 100%;
+    }
+    #map {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        display: block;
+        background: #e5e7eb;
+    }
+    .map-placeholder {
+        width: 100%;
+        height: 100%;
+        display: grid;
+        place-items: center;
+        color: #4b5563;
+        font-weight: 700;
+        text-align: center;
+        padding: 1.5rem;
+    }
+    .track-overlay {
+        position: relative;
+        background: white;
+        padding: 1.25rem;
+        border-top: 1px solid rgba(0,0,0,0.1);
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+        z-index: 10;
+        text-align: center;
+        width: 100%;
+    }
+    .track-header {
+        font-weight: 700;
+        font-size: 1.1rem;
+        margin-bottom: 0.25rem;
+        color: var(--dark);
+    }
+    .track-status {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+    .live-dot {
+        width: 10px;
+        height: 10px;
+        background: #10b981;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .live-dot.active {
+        animation: pulse-green 2s infinite;
+    }
+    @keyframes pulse-green {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+    .error-container {
+        padding: 3rem;
+        text-align: center;
+        max-width: 500px;
+        margin: auto;
+    }
+    .last-updated {
+        font-size: 0.8rem;
+        color: #6b7280;
+        margin-top: 0.25rem;
+    }
+    .track-actions {
+        margin-top: 0.85rem;
+        display: flex;
+        justify-content: center;
+        gap: 0.65rem;
+        flex-wrap: wrap;
+    }
+    .maps-link {
+        display: none;
+        padding: 0.6rem 1rem;
+        border-radius: 999px;
+        background: #0f766e;
+        color: #fff;
+        font-size: 0.9rem;
+        font-weight: 800;
+        text-decoration: none;
+        box-shadow: 0 10px 24px rgba(15, 118, 110, 0.22);
+    }
+    .maps-link:hover {
+        color: #fff;
+        text-decoration: none;
+    }
+    .evidence-panel {
+        margin-top: 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        border: 1px solid rgba(185, 28, 28, 0.16);
+        border-radius: 14px;
+        background: #fff5f5;
+        text-align: left;
+        max-width: min(92vw, 520px);
+    }
+    .evidence-panel img {
+        width: 72px;
+        height: 72px;
+        object-fit: cover;
+        border-radius: 12px;
+        border: 2px solid #fff;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16);
+    }
+    .evidence-title {
+        font-weight: 800;
+        color: #991b1b;
+        margin-bottom: 0.15rem;
+    }
+    .evidence-link {
+        font-weight: 700;
+        color: #0f766e;
+        text-decoration: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="track-container">
+    {% if error %}
+    <div class="error-container">
+        <div class="display-1 text-danger mb-4">⚠️</div>
+        <h3>Tracking Link Inactive</h3>
+        <p class="text-muted">{{ error }}</p>
+        <a href="{% url 'home' %}" class="btn btn-primary mt-3">Return to Home</a>
+    </div>
+    {% else %}
+    <div class="track-map-wrapper">
+        <div id="map" class="map-placeholder">Waiting for live location...</div>
+    </div>
+    
+    <div class="track-overlay">
+        <div class="track-header">
+            Live Tracking: {{ target_user.get_full_name|default:target_user.username }}
+        </div>
+        <div class="track-status">
+            <span class="live-dot active" id="live-dot"></span>
+            <span id="status-text">Connecting to satellite...</span>
+        </div>
+        <div class="last-updated" id="last-updated">
+            Syncing...
+        </div>
+        <div class="track-actions">
+            <a class="maps-link" id="open-maps-link" href="#" target="_blank" rel="noopener">Open in Google Maps</a>
+        </div>
+        {% if sos_alert and sos_alert.image %}
+        <div class="evidence-panel">
+            <a href="{{ sos_alert.image.url }}" target="_blank" rel="noopener">
+                <img src="{{ sos_alert.image.url }}" alt="SOS evidence photo">
+            </a>
+            <div>
+                <div class="evidence-title">Evidence photo received</div>
+                <a class="evidence-link" href="{{ sos_alert.image.url }}" target="_blank" rel="noopener">Open full photo</a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if not error %}
+<script>
+    const sessionToken = "{{ session_token }}";
+    let lastUpdate = null;
+    let lastMapsEmbedUrl = null;
+
+    async function fetchLiveLocation() {
+        try {
+            const response = await fetch(`/api/get-location/${sessionToken}/`);
+            if (!response.ok) throw new Error("Session invalid");
+            
+            const data = await response.json();
+            const pos = {
+                lat: parseFloat(data.latitude),
+                lng: parseFloat(data.longitude)
+            };
+            
+            updateMap(pos);
+            updateStatusUI(data.timestamp);
+            
+        } catch (error) {
+            console.error("Tracking Error:", error);
+            document.getElementById('status-text').textContent = "Disconnected or Expired";
+            document.getElementById('live-dot').classList.remove('active');
+            document.getElementById('live-dot').style.background = '#ef4444';
+        }
+    }
+
+    function updateMap(position) {
+        const lat = position.lat.toFixed(6);
+        const lng = position.lng.toFixed(6);
+        const mapsEmbedUrl = `https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`;
+        const mapsOpenUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+        const mapContainer = document.getElementById("map");
+        const openMapsLink = document.getElementById("open-maps-link");
+
+        if (lastMapsEmbedUrl !== mapsEmbedUrl) {
+            mapContainer.outerHTML = `<iframe id="map" src="${mapsEmbedUrl}" allowfullscreen loading="eager" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+            lastMapsEmbedUrl = mapsEmbedUrl;
+        }
+
+        openMapsLink.href = mapsOpenUrl;
+        openMapsLink.style.display = "inline-flex";
+    }
+
+    function updateStatusUI(timestamp) {
+        lastUpdate = new Date(timestamp);
+        document.getElementById('status-text').textContent = "Live tracking active";
+        document.getElementById('last-updated').textContent = `Last seen: ${lastUpdate.toLocaleTimeString()}`;
+    }
+
+    fetchLiveLocation();
+    setInterval(fetchLiveLocation, 5000);
+
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,211 @@
+{% extends 'base.html' %}
+
+{% block title %}Log in — Shakthi{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --notion-bg: #ffffff;
+        --notion-border: #edeeef;
+        --notion-text: #1a1a1a;
+        --notion-muted: #737373;
+        --notion-blue: #2383e2;
+        --notion-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    body {
+        background-color: #f7f7f8;
+        color: var(--notion-text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+
+    .shakthi-login-container {
+        max-width: 440px;
+        margin: 60px auto;
+        padding: 0 20px;
+    }
+
+    .notion-brand-header {
+        font-size: 2.5rem;
+        font-weight: 700;
+        text-align: center;
+        margin-bottom: 2rem;
+        color: var(--notion-text);
+        letter-spacing: -0.01em;
+    }
+
+    /* Social Grid */
+    .notion-divider {
+        display: flex;
+        align-items: center;
+        text-align: center;
+        color: var(--notion-muted);
+        font-size: 0.8rem;
+        font-weight: 500;
+        margin: 1.5rem 0;
+    }
+    .notion-divider::before, .notion-divider::after {
+        content: '';
+        flex: 1;
+        border-bottom: 1px solid var(--notion-border);
+    }
+    .notion-divider:not(:empty)::before { margin-right: 1.5rem; }
+    .notion-divider:not(:empty)::after { margin-left: 1.5rem; }
+
+    .brand-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+    .brand-grid.secondary {
+        grid-template-columns: repeat(2, 1fr);
+        max-width: 300px;
+        margin: 0 auto 1.5rem;
+    }
+
+    .brand-btn {
+        background: white;
+        border: 1px solid var(--notion-border);
+        border-radius: 8px;
+        padding: 0.75rem 0.5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        color: var(--notion-text);
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: background 0.1s;
+        box-shadow: var(--notion-shadow);
+    }
+    .brand-btn:hover {
+        background: #f1f1f2;
+    }
+    .brand-btn img {
+        width: 24px;
+        height: 24px;
+        margin-bottom: 0.5rem;
+    }
+    .brand-btn i {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Form Fields */
+    .form-label-notion {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--notion-muted);
+        margin-bottom: 0.5rem;
+        text-transform: capitalize;
+    }
+    .form-control-notion {
+        width: 100%;
+        padding: 0.625rem 0.875rem;
+        border: 1px solid var(--notion-border);
+        border-radius: 8px;
+        font-size: 0.95rem;
+        color: var(--notion-text);
+        background: #fafafa;
+        transition: all 0.15s;
+        margin-bottom: 0.25rem;
+    }
+    .form-control-notion:focus {
+        background: white;
+        border-color: var(--notion-blue);
+        box-shadow: 0 0 0 3px rgba(35, 131, 226, 0.12);
+        outline: none;
+    }
+    .form-help-text {
+        font-size: 0.75rem;
+        color: var(--notion-muted);
+        margin-bottom: 1.5rem;
+        line-height: 1.4;
+    }
+
+    .btn-notion-primary {
+        width: 100%;
+        background: var(--notion-blue);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.625rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.1s;
+    }
+    .btn-notion-primary:hover {
+        opacity: 0.9;
+    }
+
+    .notion-footer {
+        margin-top: 3rem;
+        text-align: center;
+        font-size: 0.75rem;
+        color: var(--notion-muted);
+        line-height: 1.6;
+    }
+    .notion-footer a {
+        color: var(--notion-muted);
+        text-decoration: underline;
+    }
+
+    .lang-selector {
+        margin-top: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.25rem;
+        color: var(--notion-muted);
+        font-size: 0.8rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="shakthi-login-container">
+    <h1 class="notion-brand-header">Log in to your Shakthi account</h1>
+
+    <form method="POST">
+        {% csrf_token %}
+        
+        <div class="form-group mb-3">
+            <label class="form-label-notion">Email</label>
+            {{ form.username }}
+            <p class="form-help-text">Use an organization email to easily collaborate with teammates</p>
+        </div>
+
+        <div class="form-group mb-4">
+            <label class="form-label-notion">Password</label>
+            {{ form.password }}
+        </div>
+
+        <button type="submit" class="btn-notion-primary mb-4">
+            Continue with Email
+        </button>
+    </form>
+
+    <div class="notion-divider">or continue with</div>
+
+    <form action="/accounts/google/login/?process=login" method="post" style="width: 100%;">
+        {% csrf_token %}
+        <button type="submit" class="brand-btn" style="flex-direction: row; gap: 0.5rem; width: 100%; padding: 0.75rem; cursor: pointer; border: 1px solid var(--notion-border); background: white;">
+            <img src="https://www.google.com/favicon.ico" alt="Google" style="width: 20px; height: 20px; margin-bottom: 0;">
+            Continue with Google
+        </button>
+    </form>
+
+    <div class="notion-footer">
+        By continuing, you acknowledge that you understand<br>
+        and agree to the <a href="#">Terms & Conditions</a> and <a href="#">Privacy Policy</a>.
+    </div>
+
+    <div class="lang-selector">
+        <i class="bi bi-globe"></i> Language: English (US) <i class="bi bi-chevron-down small"></i>
+    </div>
+</div>
+{% endblock %}

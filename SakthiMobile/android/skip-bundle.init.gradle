@@ -1,0 +1,5 @@
+gradle.taskGraph.whenReady { g ->
+    g.allTasks.findAll {
+        it.name in ['createBundleDebugJsAndAssets', 'createBundleReleaseJsAndAssets']
+    }*.enabled = false
+}

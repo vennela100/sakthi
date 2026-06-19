@@ -1,0 +1,62 @@
+# Python / Django
+__pycache__/
+*.py[cod]
+*.sqlite3
+db.sqlite3
+.env
+*.log
+django_run*.log
+
+# Local secrets and credentials
+serviceAccountKey.json
+**/google-services.json
+*.keystore
+*.jks
+
+# User-generated media / evidence
+media/
+sos_evidence/
+*.webm
+*.mp4
+*.jpg
+*.jpeg
+*.png
+!SakthiMobile/android/app/src/main/res/**/*.png
+
+# Node / React Native
+node_modules/
+.metro-run/
+.bundle/
+coverage/
+npm-debug.log
+yarn-error.log
+
+# Android / iOS build outputs
+**/.gradle/
+**/.kotlin/
+**/build/
+**/local.properties
+**/.cxx/
+**/DerivedData/
+**/Pods/
+*.apk
+*.aab
+*.ipa
+*.jsbundle
+
+# IDE / OS
+.claude/
+.idea/
+.vscode/
+.DS_Store
+*.iml
+SakthiMobile/.git_nested_backup/
+
+# Generated/debug files
+window.xml
+sakthi_screen.png
+android_build*.log
+android_pack*.log
+jsbundle*.log
+metro*.log
+SakthiMobile/npx

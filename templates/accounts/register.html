@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+
+{% block title %}Sign up — Shakthi{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --notion-bg: #ffffff;
+        --notion-border: #edeeef;
+        --notion-text: #1a1a1a;
+        --notion-muted: #737373;
+        --notion-blue: #2383e2;
+        --notion-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    body {
+        background-color: #f7f7f8;
+        color: var(--notion-text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+
+    .shakthi-auth-container {
+        max-width: 440px;
+        margin: 60px auto;
+        padding: 0 20px;
+    }
+
+    .notion-brand-header {
+        font-size: 2.5rem;
+        font-weight: 700;
+        text-align: center;
+        margin-bottom: 0.5rem;
+        color: var(--notion-text);
+        letter-spacing: -0.01em;
+    }
+
+    .notion-sub-header {
+        text-align: center;
+        color: var(--notion-muted);
+        font-size: 1.1rem;
+        margin-bottom: 2.5rem;
+    }
+
+    .form-label-notion {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--notion-muted);
+        margin-bottom: 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+    }
+
+    .form-control-notion {
+        width: 100%;
+        padding: 0.625rem 0.875rem;
+        border: 1px solid var(--notion-border);
+        border-radius: 8px;
+        font-size: 0.95rem;
+        color: var(--notion-text);
+        background: #fafafa;
+        transition: all 0.15s;
+        margin-bottom: 1.25rem;
+    }
+
+    .form-control-notion:focus {
+        background: white;
+        border-color: var(--notion-blue);
+        box-shadow: 0 0 0 3px rgba(35, 131, 226, 0.12);
+        outline: none;
+    }
+
+    .btn-notion-primary {
+        width: 100%;
+        background: var(--notion-blue);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.75rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.1s;
+        margin-top: 1rem;
+    }
+
+    .btn-notion-primary:hover {
+        opacity: 0.9;
+    }
+
+    .notion-footer {
+        margin-top: 2rem;
+        text-align: center;
+        font-size: 0.85rem;
+        color: var(--notion-muted);
+    }
+    .notion-footer a {
+        color: var(--notion-blue);
+        text-decoration: none;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="shakthi-auth-container">
+    <h1 class="notion-brand-header">Sign up</h1>
+    <p class="notion-sub-header">Start your safety journey today</p>
+
+    <form method="POST">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            <label class="form-label-notion">Full Name</label>
+            <input type="text" name="first_name" class="form-control-notion" placeholder="Enter your full name" required>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label-notion">Phone Number</label>
+            <input type="text" name="phone_number" class="form-control-notion" placeholder="Enter your mobile number" required>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label-notion">Username</label>
+            <input type="text" name="username" class="form-control-notion" placeholder="Choose a unique username" required>
+        </div>
+
+        <div class="row g-2">
+            <div class="col-6">
+                <label class="form-label-notion">Password</label>
+                <input type="password" name="password1" class="form-control-notion" placeholder="••••••••" required>
+            </div>
+            <div class="col-6">
+                <label class="form-label-notion">Confirm</label>
+                <input type="password" name="password2" class="form-control-notion" placeholder="••••••••" required>
+            </div>
+        </div>
+
+        <button type="submit" class="btn-notion-primary">
+            Create account
+        </button>
+    </form>
+
+    <div class="notion-footer">
+        Already have an account? <a href="{% url 'login' %}">Log in</a>
+    </div>
+</div>
+{% endblock %}

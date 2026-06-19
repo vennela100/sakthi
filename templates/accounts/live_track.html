@@ -1,0 +1,927 @@
+{% extends 'base.html' %}
+
+{% block title %}Live Tracking — Shakthi{% endblock %}
+
+{% block extra_css %}
+<style>
+    .lt-container {
+        min-height: calc(100vh - 90px);
+        width: 100%;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+    /* Fix for full-bleed map on mobile */
+    body { padding-bottom: 0 !important; }
+    main .container-safe { 
+        padding-left: 0 !important; 
+        padding-right: 0 !important; 
+        padding-top: 0 !important;
+        max-width: 100% !important;
+    }
+    
+    #map {
+        width: 100%;
+        height: 50vh;
+        min-height: 400px;
+        background-color: #f8f9fa;
+        position: relative;
+    }
+    /* Floating Top Bar */
+    .lt-top-bar {
+        position: absolute;
+        top: 1rem; left: 1rem; right: 1rem;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+    .lt-back-btn {
+        width: 44px; height: 44px;
+        border-radius: 12px;
+        background: white;
+        border: 1px solid var(--card-border);
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        text-decoration: none;
+        color: var(--text-main);
+        flex-shrink: 0;
+        transition: all 0.15s;
+    }
+    .lt-back-btn:hover { background: #f5f5f5; color: var(--text-main); }
+    .lt-status-pill {
+        flex: 1;
+        background: white;
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        padding: 0.625rem 1rem;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        display: flex; align-items: center; gap: 0.625rem;
+        font-size: 0.85rem; font-weight: 600; color: var(--text-main);
+    }
+    .pulse-dot {
+        width: 10px; height: 10px;
+        border-radius: 50%;
+        background: var(--success);
+        box-shadow: 0 0 0 0 rgba(15, 157, 88, 0.5);
+        animation: pulse-green 2s infinite;
+        flex-shrink: 0;
+    }
+    .pulse-dot.inactive {
+        background: var(--danger);
+        animation: pulse-red-dot 2s infinite;
+    }
+    @keyframes pulse-green {
+        0% { box-shadow: 0 0 0 0 rgba(15, 157, 88, 0.5); }
+        70% { box-shadow: 0 0 0 8px rgba(15, 157, 88, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(15, 157, 88, 0); }
+    }
+    @keyframes pulse-red-dot {
+        0% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0.5); }
+        70% { box-shadow: 0 0 0 8px rgba(217, 48, 37, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0); }
+    }
+    /* Bottom panel */
+    .lt-bottom-panel {
+        background: white;
+        border-top: 1px solid var(--card-border);
+        padding: 1.5rem;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.03);
+        z-index: 10;
+        position: relative;
+    }
+    /* Nav search row */
+    .lt-nav-row {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+        position: relative;
+    }
+    .lt-nav-row input {
+        flex: 1;
+        border: 1px solid var(--card-border);
+        border-radius: 10px;
+        padding: 0.625rem 0.875rem;
+        font-size: 0.875rem;
+        outline: none;
+        font-family: inherit;
+        background: #f8f9fa;
+    }
+    .lt-nav-row input:focus { border-color: var(--primary); background: white; }
+    .lt-nav-btn {
+        padding: 0 1rem;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        cursor: pointer;
+    }
+    .lt-nav-btn:hover { opacity: 0.9; }
+    .lt-nav-clear {
+        padding: 0 0.75rem;
+        background: #f1f1f2;
+        color: var(--text-muted);
+        border: none;
+        border-radius: 10px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        display: none;
+    }
+    /* Autocomplete */
+    .lt-autocomplete {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0; right: 5rem;
+        background: white;
+        border: 1px solid var(--card-border);
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        z-index: 9999;
+        max-height: 200px;
+        overflow-y: auto;
+        display: none;
+    }
+    .lt-autocomplete div {
+        padding: 10px 12px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .lt-autocomplete div:last-child { border-bottom: none; }
+    .lt-autocomplete div:hover { background: #f5f5f5; }
+    /* Address */
+    .lt-address {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        margin-bottom: 0.875rem;
+    }
+    /* Stats grid */
+    .lt-info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+    .lt-info-item {
+        text-align: center;
+        padding: 0.75rem 0.5rem;
+        background: #f8f9fa;
+        border-radius: 10px;
+        border: 1px solid var(--card-border);
+    }
+    .lt-info-item .value {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text-main);
+        line-height: 1.2;
+    }
+    .lt-info-item .label {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        margin-top: 0.25rem;
+    }
+    /* Actions */
+    .lt-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+    }
+    .lt-action-btn {
+        height: 48px;
+        border-radius: 10px;
+        border: none;
+        font-size: 0.875rem;
+        font-weight: 600;
+        display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+    .lt-action-share { background: var(--primary); color: white; }
+    .lt-action-share:hover { opacity: 0.9; }
+    .lt-action-sos { background: var(--danger); color: white; animation: pulse-red 2s infinite; }
+    /* Toast */
+    .lt-toast {
+        position: fixed;
+        bottom: 5rem;
+        left: 50%;
+        transform: translateX(-50%) translateY(10px);
+        z-index: 9000;
+        background: #1a1a1a; color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 10px;
+        font-size: 0.85rem; font-weight: 500;
+        opacity: 0;
+        transition: all 0.3s ease;
+        pointer-events: none;
+        white-space: nowrap;
+    }
+    .lt-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .pulse-dot.inactive {
+        background: var(--danger);
+        animation: pulse-red-dot 2s infinite;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Smart Stop Detection Modal -->
+<div class="sos-overlay" id="stop-detect-modal" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); flex-direction: column; align-items: center; justify-content: center; padding: 2rem; text-align: center;">
+    <i class="bi bi-exclamation-triangle-fill text-warning mb-3" style="font-size: 4rem;"></i>
+    <h1 class="mb-2" style="color: var(--text-main); font-weight: 800;">Unusual Stop Detected</h1>
+    <p class="mb-4 text-muted" style="font-size: 1.1rem;">You haven't moved recently. Are you safe?</p>
+    <div class="card-premium p-4 w-100 mb-4 bg-light" style="max-width: 400px; border: 1px solid var(--card-border);">
+        <div class="fw-bold text-danger mb-1">SOS Auto-Trigger in:</div>
+        <div id="stop-countdown" style="font-size: 4rem; font-weight: 800; font-family: monospace; color: var(--danger); line-height: 1;">15</div>
+        <div class="small text-muted mt-2">seconds</div>
+    </div>
+    <div class="w-100 d-flex gap-3" style="max-width: 400px;">
+        <button class="btn-premium btn-soft w-100 py-3" onclick="confirmSafe()" style="flex: 1; font-weight: bold;">
+            <i class="bi bi-check-circle-fill me-2 text-success"></i> I AM SAFE
+        </button>
+        <button class="btn-premium w-100 py-3" onclick="triggerSOSImmediate()" style="flex: 1; background: var(--danger); color: white; border: none; font-weight: bold;">
+            SOS NOW
+        </button>
+    </div>
+</div>
+
+<div class="lt-container">
+    <div class="lt-map-wrapper" style="flex: 1; position: relative;">
+        <!-- Map -->
+        <div id="map"></div>
+
+        <!-- Top Bar -->
+        <div class="lt-top-bar">
+            <a href="{% url 'home' %}" class="lt-back-btn">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+            <div class="lt-status-pill">
+                <span class="pulse-dot" id="status-dot"></span>
+                <span id="status-text">Acquiring location...</span>
+            </div>
+        </div>
+    </div>
+
+        <!-- Bottom Panel -->
+        <div class="lt-bottom-panel">
+
+            <!-- Search / Navigate -->
+            <div class="lt-nav-row" id="nav-row">
+                <input type="text" id="dest-input" placeholder="🔍 Navigate to a destination..." autocomplete="off">
+                <button class="lt-nav-btn" onclick="searchAndRoute()">Go</button>
+                <button class="lt-nav-clear" id="clear-route-btn" onclick="clearRoute()">✕ Clear</button>
+                <div class="lt-autocomplete" id="lt-autocomplete"></div>
+            </div>
+
+            <!-- Address -->
+            <div class="lt-address" id="lt-address">
+                <i class="bi bi-geo-alt-fill me-1"></i>Locating your address...
+            </div>
+
+            <!-- Stats -->
+            <div class="lt-info-grid">
+                <div class="lt-info-item">
+                    <div class="value" id="lt-lat">—</div>
+                    <div class="label">Latitude</div>
+                </div>
+                <div class="lt-info-item">
+                    <div class="value" id="lt-lng">—</div>
+                    <div class="label">Longitude</div>
+                </div>
+                <div class="lt-info-item">
+                    <div class="value" id="lt-dist">0 m</div>
+                    <div class="label">Distance</div>
+                </div>
+            </div>
+
+            <!-- Tracking Session Info Panel -->
+            <div id="tracking-session-info" style="display: {% if active_session %}flex{% else %}none{% endif %}; background: rgba(217, 48, 37, 0.1); border: 1px solid var(--danger); padding: 1rem; border-radius: 12px; margin-bottom: 1rem; flex-direction: column;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <div style="color: var(--danger); font-weight: 800;"><span class="pulse-dot inactive d-inline-block me-1" style="width:10px;height:10px;"></span> LIVE TRACKING ACTIVE</div>
+                </div>
+                <div style="font-size: 0.85rem; color: var(--text-main);">
+                    Your live location is being securely shared every 7 seconds. 
+                </div>
+                <button class="btn btn-outline-danger btn-sm mt-3" style="font-weight: 600;" onclick="window.tracker && window.tracker.stopSession()">Stop Sharing</button>
+            </div>
+
+            <!-- Media Capture Preview -->
+            <div id="media-preview-container" style="display: none; margin-bottom: 1rem; position: relative; border-radius: 12px; overflow: hidden; border: 2px solid var(--primary);">
+                <video id="camera-feed" autoplay playsinline muted style="width: 100%; height: 180px; object-fit: cover; background: #000; display: block;"></video>
+                <canvas id="photo-canvas" style="display: none;"></canvas>
+                <img id="photo-preview" style="display: none; width: 100%; height: 180px; object-fit: cover;">
+                <div id="recording-indicator" style="display: none; position: absolute; top: 10px; right: 10px; background: rgba(217, 48, 37, 0.8); color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; align-items: center; gap: 5px;">
+                    <span style="width: 8px; height: 8px; background: white; border-radius: 50%; animation: pulse-red 1s infinite;"></span>
+                    REC <span id="recording-timer">00:00</span>
+                </div>
+                <button type="button" onclick="resetMedia()" style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.5); color: white; border: none; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+
+            <!-- Media Actions -->
+            <div class="lt-media-actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+                <button id="btn-photo" class="lt-action-btn" style="background: #f1f1f2; color: var(--text-main); height: 40px; font-size: 0.8rem;" onclick="toggleCamera()">
+                    <i class="bi bi-camera-fill"></i> <span id="photo-btn-text">Capture Photo</span>
+                </button>
+                <button id="btn-audio" class="lt-action-btn" style="background: #f1f1f2; color: var(--text-main); height: 40px; font-size: 0.8rem;" onclick="toggleAudio()">
+                    <i class="bi bi-mic-fill"></i> <span id="audio-btn-text">Record Audio</span>
+                </button>
+            </div>
+
+            <!-- Actions -->
+            <div class="lt-actions">
+                <button class="lt-action-btn lt-action-share" onclick="shareLocation()">
+                    <i class="bi bi-share-fill"></i> Share Location
+                </button>
+                <button class="lt-action-btn lt-action-sos" id="sos-btn" onclick="triggerSOS()">
+                    <i class="bi bi-exclamation-triangle-fill"></i> SOS
+                </button>
+            </div>
+        </div>
+    </div>
+
+<!-- Toast -->
+<div class="lt-toast" id="toast">Copied!</div>
+
+{% csrf_token %}
+{% endblock %}
+
+{% block extra_js %}
+<!-- Google Maps Platform -->
+<script src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}&libraries=places,geometry,marker&v=weekly" defer></script>
+<script>
+    const CSRF = '{{ csrf_token }}';
+    const ACTIVE_SESSION_ID = "{{ active_session.id|default:'' }}";
+    const ACTIVE_SOS = {% if active_sos %}true{% else %}false{% endif %};
+    const HISTORY_DATA = {{ history_data_json|safe|default:"[]" }};
+
+    class LocationTracker {
+        constructor() {
+            this.sessionId = ACTIVE_SESSION_ID;
+            this.intervalDelay = ACTIVE_SOS ? 5000 : 7000;
+            this.trackingInterval = null;
+            if (this.sessionId || ACTIVE_SOS) {
+                this._startLoop();
+            }
+        }
+        
+        _startLoop() {
+            if (this.trackingInterval) clearInterval(this.trackingInterval);
+            this.trackingInterval = setInterval(() => this.sendLocation(), this.intervalDelay);
+            document.getElementById('tracking-session-info').style.display = 'flex';
+        }
+
+        startSession(sosAlertId = null) {
+            fetch('/api/v1/tracking/start/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+                body: JSON.stringify({ sos_alert_id: sosAlertId })
+            }).then(r => r.json()).then(data => {
+                this.sessionId = data.session_id;
+                this.intervalDelay = sosAlertId ? 5000 : 7000;
+                this._startLoop();
+            }).catch(e => console.error('Tracking session error', e));
+        }
+
+        stopSession() {
+            fetch('/api/v1/tracking/stop/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF }
+            });
+            if (this.trackingInterval) clearInterval(this.trackingInterval);
+            this.trackingInterval = null;
+            this.sessionId = null;
+            document.getElementById('tracking-session-info').style.display = 'none';
+        }
+
+        sendLocation() {
+            if (!lastPos) return;
+            fetch("/api/v1/update-location/", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+                body: JSON.stringify({ latitude: lastPos.lat, longitude: lastPos.lng, speed: 0 })
+            }).catch(e => { /* rate limiting */ });
+        }
+    }
+
+    const REPORT_COLORS = {
+        'harassment': '#d93025',
+        'suspicious_activity': '#f29900',
+        'dark_area': '#d93025'
+    };
+    const ZONE_COLORS = {
+        'safe': '#0f9d58',
+        'suspicious': '#f29900',
+        'danger': '#d93025'
+    };
+
+    let watchId = null;
+    let pathLine = null;
+    let pathCoordinates = [];
+    let totalDistance = 0;
+    let lastPos = null;
+    let isFirstFix = true;
+    let updateInterval = null;
+    let lastMovementTime = Date.now();
+    let stopDetectorInterval = null, stopCountdownInterval = null, stopModalActive = false;
+    
+    // Google Maps specific
+    let map = null;
+    let userMarker = null;
+    let destMarker = null;
+    let directionsService = null;
+    // Disable global tracking if present
+    if (typeof globalWatchId !== 'undefined' && globalWatchId !== null) {
+        navigator.geolocation.clearWatch(globalWatchId);
+        globalWatchId = null;
+        console.log('Global background tracker disabled for active live tracking');
+    }
+
+    let directionsRenderer = null;
+    let autocomplete = null;
+
+    // Wait for maps to load
+    let mapsInitStarted = false;
+    let mapsInitInterval = setInterval(() => {
+        if(typeof google !== 'undefined' && typeof google.maps !== 'undefined') {
+            if (mapsInitStarted) return;
+            mapsInitStarted = true;
+            clearInterval(mapsInitInterval);
+            startTracking();
+        }
+    }, 100);
+
+    // ── MAP INIT ─────────────────────────────────────────────────────
+    function initMap() {
+        console.log('Initializing Google Map on #map element...');
+        const mapEl = document.getElementById('map');
+        if (!mapEl) {
+            console.error('Map element #map not found!');
+            return;
+        }
+        
+        const defaultLocation = { lat: 17.3850, lng: 78.4867 };
+        map = new google.maps.Map(mapEl, {
+            center: defaultLocation,
+            zoom: 15,
+            disableDefaultUI: true,
+            zoomControl: true,
+        });
+
+        directionsService = new google.maps.DirectionsService();
+        directionsRenderer = new google.maps.DirectionsRenderer({
+            map: map,
+            suppressMarkers: false,
+            polylineOptions: { strokeColor: '#2383e2', strokeWeight: 6, strokeOpacity: 0.9 }
+        });
+
+        pathLine = new google.maps.Polyline({
+            path: [], strokeColor: '#e22379', strokeOpacity: 0.8, strokeWeight: 5
+        });
+        pathLine.setMap(map);
+        
+        if (HISTORY_DATA && HISTORY_DATA.length > 0) {
+            HISTORY_DATA.forEach(pt => {
+                pathCoordinates.push({ lat: pt.lat, lng: pt.lng });
+                new google.maps.Circle({
+                    strokeColor: '#e22379', strokeOpacity: 0.8, strokeWeight: 1,
+                    fillColor: '#e22379', fillOpacity: 0.8, map, center: {lat: pt.lat, lng: pt.lng}, radius: 3
+                });
+            });
+            pathLine.setPath(pathCoordinates);
+            if (pathCoordinates.length > 0) {
+                map.setCenter(pathCoordinates[pathCoordinates.length - 1]);
+            }
+        }
+        
+        loadDangerZones();
+        initAutocomplete();
+    }
+
+    // ── DANGER ZONES FROM BACKEND ─────────────────────────────────
+    function loadDangerZones() {
+        fetch("{% url 'api_reports' %}")
+        .then(r => r.json())
+        .then(data => {
+            (data.reports || []).forEach(rep => {
+                const lat = parseFloat(rep.lat);
+                const lng = parseFloat(rep.lng);
+                if (isNaN(lat) || isNaN(lng)) return;
+                
+                const col = REPORT_COLORS[rep.type] || '#666';
+                new google.maps.Circle({
+                    strokeColor: 'white', strokeOpacity: 1, strokeWeight: 2.5,
+                    fillColor: col, fillOpacity: 1, map, center: { lat, lng }, radius: 10, zIndex: 100
+                });
+                new google.maps.Circle({
+                    strokeColor: col, strokeOpacity: 0.8, strokeWeight: 1,
+                    fillColor: col, fillOpacity: 0.1, map, center: { lat, lng }, radius: 150
+                });
+            });
+            (data.zones || []).forEach(z => {
+                const col = ZONE_COLORS[z.zone_type] || '#666';
+                new google.maps.Circle({
+                    strokeColor: col, strokeOpacity: 0.8, strokeWeight: 2,
+                    fillColor: col, fillOpacity: 0.12, map, center: { lat: z.lat, lng: z.lng }, radius: z.radius
+                }); // dash array equivalent unsupported on native circle, polyline needed but circle suffices
+            });
+        }).catch(e => console.error('Danger zones error:', e));
+    }
+
+    // ── LIVE GPS TRACKING ─────────────────────────────────────────
+    function startTracking() {
+        if (!navigator.geolocation) { setStatus('GPS not supported', true); return; }
+        initMap();
+        window.tracker = new LocationTracker();
+        
+        watchId = navigator.geolocation.watchPosition(onPositionUpdate, onPositionError, {
+            enableHighAccuracy: true, maximumAge: 3000, timeout: 15000
+        });
+        stopDetectorInterval = setInterval(() => {
+            if (!stopModalActive && Date.now() - lastMovementTime > 30000) promptSafetyCheck();
+        }, 5000);
+    }
+
+    function onPositionUpdate(pos) {
+        const lat = pos.coords.latitude, lng = pos.coords.longitude;
+        const currentLoc = { lat, lng };
+
+        if (isFirstFix) {
+            isFirstFix = false;
+            setStatus('Live tracking active', false);
+            map.setCenter(currentLoc);
+            map.setZoom(17);
+        }
+
+        // User marker
+        if (!userMarker) {
+            const pinColor = "#2383e2";
+            userMarker = new google.maps.Marker({
+                position: currentLoc,
+                map: map,
+                title: 'You are here',
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    fillColor: pinColor,
+                    fillOpacity: 1,
+                    strokeColor: 'white',
+                    strokeWeight: 2,
+                    scale: 8
+                }
+            });
+        } else {
+            userMarker.setPosition(currentLoc);
+        }
+
+        // Stats
+        document.getElementById('lt-lat').textContent = lat.toFixed(5);
+        document.getElementById('lt-lng').textContent = lng.toFixed(5);
+
+        if (lastPos) {
+            const dist = google.maps.geometry.spherical.computeDistanceBetween(
+                new google.maps.LatLng(lastPos.lat, lastPos.lng), 
+                new google.maps.LatLng(lat, lng)
+            );
+            if (dist > 5) {
+                totalDistance += dist;
+                pathCoordinates.push(currentLoc);
+                pathLine.setPath(pathCoordinates);
+                lastMovementTime = Date.now();
+                if (stopModalActive) confirmSafe();
+                map.panTo(currentLoc);
+                reverseGeocode(lat, lng);
+            }
+        } else {
+            pathCoordinates.push(currentLoc);
+            pathLine.setPath(pathCoordinates);
+            lastMovementTime = Date.now();
+            reverseGeocode(lat, lng);
+        }
+
+        const dm = totalDistance;
+        document.getElementById('lt-dist').textContent = dm >= 1000 ? (dm/1000).toFixed(2)+' km' : Math.round(dm)+' m';
+        lastPos = currentLoc;
+    }
+
+    function onPositionError(err) {
+        const msgs = { 1: 'Location permission denied', 2: 'Location unavailable', 3: 'Location timeout' };
+        setStatus(msgs[err.code] || 'Location error', true);
+    }
+
+    // ── REVERSE GEOCODE ─────────────────────────────────────────
+    let geocodeTimer = null;
+    function reverseGeocode(lat, lng) {
+        clearTimeout(geocodeTimer);
+        geocodeTimer = setTimeout(() => {
+            const geocoder = new google.maps.Geocoder();
+            geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+                if (status === "OK" && results[0]) {
+                    const parts = results[0].formatted_address.split(',');
+                    document.getElementById('lt-address').innerHTML = `<i class="bi bi-geo-alt-fill me-1"></i>${parts.slice(0,3).join(', ')}`;
+                }
+            });
+        }, 2000);
+    }
+
+    // ── GOOGLE PLACES AUTOCOMPLETE ────────────────────────────────
+    function initAutocomplete() {
+        const destInput = document.getElementById('dest-input');
+        autocomplete = new google.maps.places.Autocomplete(destInput, { fields: ['geometry', 'name', 'formatted_address'] });
+    }
+
+    // ── SEARCH + DRAW ROUTE (GOOGLE DIRECTIONS) ───────────────────
+    async function searchAndRoute() {
+        const destInput = document.getElementById('dest-input');
+        const query = destInput.value;
+        if (!query) return;
+
+        if (!lastPos) { showToast('Waiting for your GPS...'); return; }
+        setStatus('Searching...', false);
+
+        const place = autocomplete.getPlace();
+        let destination = query;
+        if(place && place.geometry) destination = place.geometry.location;
+
+        showToast('Finding route...');
+        
+        directionsService.route({
+            origin: new google.maps.LatLng(lastPos.lat, lastPos.lng),
+            destination: destination,
+            travelMode: google.maps.TravelMode.DRIVING
+        }, (response, status) => {
+            if (status === "OK") {
+                directionsRenderer.setDirections(response);
+                const route = response.routes[0];
+                const leg = route.legs[0];
+                showToast(`Route: ${leg.distance.text} · ~${leg.duration.text} driving`);
+                document.getElementById('clear-route-btn').style.display = 'block';
+            } else {
+                showToast('Routing failed.');
+            }
+            setStatus('Live tracking active', false);
+        });
+    }
+
+    function clearRoute() {
+        directionsRenderer.setDirections({routes: []}); // clears route
+        document.getElementById('dest-input').value = '';
+        document.getElementById('clear-route-btn').style.display = 'none';
+        if (lastPos) {
+            map.setZoom(17);
+            map.panTo(lastPos);
+        }
+    }
+
+    // ── HELPERS ───────────────────────────────────────────────────
+    function haversine(lat1, lon1, lat2, lon2) {
+        const R = 6371000, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
+        const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function saveLocationToServer() {
+        if (window.tracker) window.tracker.sendLocation();
+    }
+
+    function setStatus(text, isError) {
+        document.getElementById('status-text').textContent = text;
+        document.getElementById('status-dot').className = isError ? 'pulse-dot inactive' : 'pulse-dot';
+    }
+
+    function shareLocation() {
+        if (!lastPos) { showToast('Location not available yet'); return; }
+        const url = `https://www.google.com/maps?q=${lastPos.lat.toFixed(6)},${lastPos.lng.toFixed(6)}`;
+        const text = `My live location (Shakthi Safety): ${url}`;
+        if (navigator.share) navigator.share({ title: 'My Location', text, url }).catch(() => fallbackCopy(text));
+        else fallbackCopy(text);
+    }
+
+    function fallbackCopy(text) {
+        navigator.clipboard.writeText(text).then(() => showToast('Location link copied!')).catch(() => showToast('Could not copy link'));
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('visible');
+        setTimeout(() => t.classList.remove('visible'), 2800);
+    }
+
+    // ── SMART STOP DETECTION ──────────────────────────────────────
+    function promptSafetyCheck() {
+        stopModalActive = true;
+        document.getElementById('stop-detect-modal').style.display = 'flex';
+        let timeLeft = 15;
+        document.getElementById('stop-countdown').innerText = timeLeft;
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
+        stopCountdownInterval = setInterval(() => {
+            timeLeft--;
+            document.getElementById('stop-countdown').innerText = timeLeft;
+            if (timeLeft <= 0) { clearInterval(stopCountdownInterval); triggerSOSImmediate(); }
+        }, 1000);
+    }
+
+    function confirmSafe() {
+        stopModalActive = false;
+        clearInterval(stopCountdownInterval);
+        document.getElementById('stop-detect-modal').style.display = 'none';
+        lastMovementTime = Date.now();
+    }
+
+    function triggerSOSImmediate() {
+        clearInterval(stopCountdownInterval);
+        document.getElementById('stop-detect-modal').style.display = 'none';
+        triggerSOS();
+    }
+
+    // ── MEDIA CAPTURE LOGIC ─────────────────────────────────────────
+    let mediaStream = null, audioStream = null, mediaRecorder = null, audioChunks = [];
+    let isCameraActive = false, isRecordingActive = false, recordingStartTime = null;
+    let photoBlob = null, audioBlob = null;
+    let recordingTimerInterval = null;
+
+    async function toggleCamera() {
+        const video = document.getElementById('camera-feed');
+        const photoPreview = document.getElementById('photo-preview');
+        const container = document.getElementById('media-preview-container');
+        const btnText = document.getElementById('photo-btn-text');
+
+        if (!isCameraActive) {
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+                video.srcObject = mediaStream;
+                video.style.display = 'block';
+                photoPreview.style.display = 'none';
+                container.style.display = 'block';
+                btnText.textContent = "Take Snapshot";
+                isCameraActive = true;
+            } catch (err) {
+                showToast("Camera access denied or unavailable.");
+                console.error(err);
+            }
+        } else {
+            // Take Snapshot
+            const canvas = document.getElementById('photo-canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            canvas.toBlob((blob) => {
+                photoBlob = blob;
+                photoPreview.src = URL.createObjectURL(blob);
+                photoPreview.style.display = 'block';
+                video.style.display = 'none';
+                btnText.textContent = "Retake Photo";
+                stopCamera();
+                isCameraActive = false;
+            }, 'image/jpeg', 0.8);
+        }
+    }
+
+    function stopCamera() {
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop());
+            mediaStream = null;
+        }
+    }
+
+    async function toggleAudio() {
+        const btnText = document.getElementById('audio-btn-text');
+        const indicator = document.getElementById('recording-indicator');
+        const timerText = document.getElementById('recording-timer');
+        const container = document.getElementById('media-preview-container');
+
+        if (!isRecordingActive) {
+            try {
+                audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(audioStream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    if (audioBlob.size > 2 * 1024 * 1024) {
+                        showToast("Audio too large. Try shorter recording.");
+                        audioBlob = null;
+                    }
+                    stopAudioStream();
+                };
+
+                mediaRecorder.start();
+                container.style.display = 'block';
+                indicator.style.display = 'flex';
+                isRecordingActive = true;
+                btnText.textContent = "Stop Recording";
+                recordingStartTime = Date.now();
+                
+                recordingTimerInterval = setInterval(() => {
+                    const sec = Math.floor((Date.now() - recordingStartTime) / 1000);
+                    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+                    const s = (sec % 60).toString().padStart(2, '0');
+                    timerText.textContent = `${m}:${s}`;
+                    if (sec >= 20) toggleAudio(); // Auto-stop at 20s
+                }, 1000);
+
+            } catch (err) {
+                showToast("Microphone access denied.");
+            }
+        } else {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+            clearInterval(recordingTimerInterval);
+            indicator.style.display = 'none';
+            btnText.textContent = "Record Again";
+            isRecordingActive = false;
+        }
+    }
+
+    function stopAudioStream() {
+        if (audioStream) {
+            audioStream.getTracks().forEach(track => track.stop());
+            audioStream = null;
+        }
+    }
+
+    function resetMedia() {
+        stopCamera();
+        if (isRecordingActive) toggleAudio();
+        photoBlob = null;
+        audioBlob = null;
+        document.getElementById('media-preview-container').style.display = 'none';
+        document.getElementById('photo-btn-text').textContent = "Capture Photo";
+        document.getElementById('audio-btn-text').textContent = "Record Audio";
+    }
+
+    async function triggerSOS() {
+        const sosBtn = document.getElementById('sos-btn');
+        sosBtn.disabled = true;
+        sosBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> SENDING...';
+
+        // Auto-stop recording if it was running
+        if (isRecordingActive) {
+            toggleAudio();
+            // Wait a small bit for the onstop to fire and create the blob
+            await new Promise(r => setTimeout(r, 400));
+        }
+
+        // Auto-stop camera if it was running
+        if (isCameraActive) {
+            stopCamera();
+            isCameraActive = false;
+            document.getElementById('photo-btn-text').textContent = "Capture Photo";
+        }
+
+        const lat = lastPos ? lastPos.lat : null, lng = lastPos ? lastPos.lng : null;
+        
+        const formData = new FormData();
+        formData.append('latitude', lat || '');
+        formData.append('longitude', lng || '');
+        
+        if (photoBlob) formData.append('image', photoBlob, 'sos_capture.jpg');
+        if (audioBlob) formData.append('audio', audioBlob, 'sos_audio.webm');
+
+        // Hide all media previews during alert dispatch
+        document.getElementById('media-preview-container').style.display = 'none';
+
+        fetch('/api/v1/sos/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF },
+            body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            showToast('🚨 SOS Activated! Media sent.');
+            sosBtn.disabled = false;
+            sosBtn.innerHTML = '<i class="bi bi-exclamation-triangle-fill"></i> SOS';
+            
+            if (window.tracker) window.tracker.startSession(data.sos_id);
+            
+            // Notification logic...
+            const locUrl = (lat && lng) ? `https://www.google.com/maps?q=${lat},${lng}` : 'Location unavailable';
+            
+            // Fallback: Notify manually via SMS link (if no twilio)
+            // window.open('tel:112', '_blank');
+        })
+        .catch(err => {
+            console.error(err);
+            showToast('SOS trigger failed. Retrying...');
+            sosBtn.disabled = false;
+        });
+    }
+
+    window.addEventListener('beforeunload', () => {
+        if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+        if (updateInterval) clearInterval(updateInterval);
+    });
+</script>
+{% endblock %}

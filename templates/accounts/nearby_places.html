@@ -1,0 +1,546 @@
+{% extends 'base.html' %}
+
+{% block title %}Nearby Safe Places — Shakthi{% endblock %}
+
+{% block extra_css %}
+<style>
+    .np-container {
+        max-width: 100%;
+        margin: 0;
+        padding: 0;
+        position: relative;
+        height: calc(100vh - 70px);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .np-map-wrapper {
+        flex: 1;
+        position: relative;
+        width: 100%;
+        overflow: hidden;
+    }
+
+    #map {
+        width: 100%;
+        height: 100%; /* Relative to np-map-wrapper */
+        z-index: 1;
+    }
+
+    /* Top bar */
+    .np-top-bar {
+        position: absolute;
+        top: 1rem;
+        left: 1rem;
+        right: 1rem;
+        z-index: 1000;
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .np-back-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: white;
+        border: 1px solid var(--card-border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        text-decoration: none;
+        color: var(--text-main);
+        flex-shrink: 0;
+        transition: all 0.15s;
+    }
+    .np-back-btn:hover { background: #f5f5f5; color: var(--text-main); }
+
+    .np-title-pill {
+        flex: 1;
+        background: white;
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        padding: 0.625rem 1rem;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-main);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    /* Category filters */
+    .np-filters {
+        position: absolute;
+        top: 4.5rem;
+        left: 1rem;
+        right: 1rem;
+        z-index: 1000;
+        display: flex;
+        gap: 0.5rem;
+        overflow-x: auto;
+        padding-bottom: 0.25rem;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .np-filters::-webkit-scrollbar { display: none; }
+
+    .np-filter-btn {
+        flex-shrink: 0;
+        padding: 0.5rem 1rem;
+        border-radius: 2rem;
+        border: 1px solid var(--card-border);
+        background: white;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.15s;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        white-space: nowrap;
+    }
+    .np-filter-btn.active {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+    .np-filter-btn:hover:not(.active) { background: #f5f5f5; }
+
+    /* Loading overlay */
+    .np-loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1001;
+        background: white;
+        padding: 1.25rem 2rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--text-main);
+    }
+    .np-loading.hidden { display: none; }
+
+    .np-spinner {
+        width: 20px;
+        height: 20px;
+        border: 3px solid var(--card-border);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Re-center */
+    .np-recenter {
+        position: absolute;
+        bottom: 2rem;
+        right: 1rem;
+        z-index: 1000;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: white;
+        border: 1px solid var(--card-border);
+        box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: var(--primary);
+        font-size: 1.1rem;
+        transition: all 0.15s;
+    }
+    .np-recenter:hover { background: var(--primary); color: white; }
+    
+
+    .cancel-nav-btn {
+        position: absolute;
+        top: 4.5rem;
+        right: 1rem;
+        z-index: 1000;
+        background: #d93025;
+        color: white;
+        border: none;
+        border-radius: 20px;
+        padding: 0.4rem 1rem;
+        font-weight: 600;
+        font-size: 0.85rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        display: none;
+        cursor: pointer;
+    }
+    .cancel-nav-btn:hover { background: #b3261d; }
+
+    .np-nearest-banner {
+        position: relative;
+        z-index: 1000;
+        background: white;
+        border-top: 1px solid var(--card-border);
+        padding: 1rem 1.5rem;
+        box-shadow: 0 -4px 12px rgba(0,0,0,0.05);
+        display: none;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .np-nearest-banner .title {
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: var(--text-main);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .np-nearest-banner .subtitle {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+    .np-nearest-banner button {
+        background: var(--primary);
+        color: white;
+        border: none;
+        padding: 0.6rem;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .np-nearest-banner button:hover {
+        background: #0d8a4d;
+    }
+    
+    @media (max-width: 576px) {
+        .np-nearest-banner {
+            bottom: 1rem;
+            left: 1rem;
+            right: 1rem;
+        }
+        .np-recenter {
+            bottom: 8rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="np-container">
+    <div class="np-map-wrapper">
+        <div id="map"></div>
+
+        <div class="np-top-bar">
+            <a href="{% url 'home' %}" class="np-back-btn">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+            <div class="np-title-pill">
+                <i class="bi bi-geo-alt-fill text-danger"></i>
+                <span>Nearby Places</span>
+                <span id="places-count" class="badge bg-primary ms-auto" style="display:none; border-radius: 10px; font-size: 0.75rem;"></span>
+            </div>
+        </div>
+
+        <div class="np-filters" id="np-filters">
+            <button class="np-filter-btn active" data-type="police">
+                🚔 Police Stations
+            </button>
+            <button class="np-filter-btn" data-type="hospital">
+                🏥 Hospitals
+            </button>
+            <button class="np-filter-btn" data-type="fire_station">
+                🚒 Fire Stations
+            </button>
+            <button class="np-filter-btn" data-type="pharmacy">
+                💊 Pharmacies
+            </button>
+        </div>
+
+        <!-- Cancel navigation -->
+        <button class="cancel-nav-btn" id="cancel-nav-btn" onclick="cancelNavigation()">
+            <i class="bi bi-x-circle me-1"></i> Exit Nav
+        </button>
+
+        <!-- Recenter button -->
+        <div class="np-recenter" id="np-recenter" onclick="centerMapOnUser()">
+            <i class="bi bi-crosshair"></i>
+        </div>
+    </div>
+
+    <!-- Nearest Place Banner -->
+    <div class="np-nearest-banner" id="np-nearest-banner">
+        <div class="title">
+            <span id="nearest-title">Nearest Place</span>
+            <span id="nearest-dist" class="badge bg-warning text-dark"></span>
+        </div>
+        <div class="subtitle" id="nearest-subtitle">Loading...</div>
+        <button id="nearest-nav-btn" onclick="">
+            <i class="bi bi-cursor-fill me-1"></i> Start Navigating
+        </button>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="np-loading" id="loading-overlay">
+        <div class="np-spinner"></div>
+        <span>Finding nearby places...</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Google Maps Platform -->
+<script src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}&libraries=places,geometry,marker&v=weekly" defer></script>
+<script>
+    let map;
+    let userMarker;
+    let currentLocation = null;
+    let currentCategory = 'police';
+    let markers = [];
+    let directionsService;
+    let directionsRenderer;
+    let placesService;
+
+    const CATEGORY_MAP = {
+        'police': 'police',
+        'hospital': 'hospital',
+        'fire_station': 'fire_station',
+        'pharmacy': 'pharmacy'
+    };
+
+    function initMap() {
+        if(typeof google === 'undefined' || typeof google.maps === 'undefined') {
+            setTimeout(initMap, 100);
+            return;
+        }
+
+        map = new google.maps.Map(document.getElementById('map'), {
+            center: { lat: 17.3850, lng: 78.4867 },
+            zoom: 13,
+            mapId: 'DEMO_MAP_ID',
+            disableDefaultUI: false,
+        });
+
+        // Hide overlay once map initializes
+        if (document.getElementById('loading-overlay')) {
+            document.getElementById('loading-overlay').classList.add('hidden');
+        }
+
+        directionsService = new google.maps.DirectionsService();
+        directionsRenderer = new google.maps.DirectionsRenderer({
+            map: map,
+            suppressMarkers: false,
+            polylineOptions: { strokeColor: '#0f9d58', strokeWeight: 6, strokeOpacity: 0.8 }
+        });
+
+        placesService = new google.maps.places.PlacesService(map);
+
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(pos => {
+                const newPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                if (!currentLocation) {
+                    currentLocation = newPos;
+                    map.setCenter(currentLocation);
+                    map.setZoom(14);
+                    const pulseDiv = document.createElement("div");
+                    pulseDiv.style.position = "relative";
+                    pulseDiv.style.width = "24px";
+                    pulseDiv.style.height = "24px";
+                    pulseDiv.innerHTML = '<div style="position:absolute;inset:0;border-radius:50%;background:rgba(35,131,226,0.25);animation:pulse-user 2s infinite;"></div><div style="position:absolute;top:4px;left:4px;width:16px;height:16px;border-radius:50%;background:#2383e2;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>';
+                    if(google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+                        userMarker = new google.maps.marker.AdvancedMarkerElement({ position: currentLocation, map, content: pulseDiv, title: "You are here" });
+                    } else {
+                        userMarker = new google.maps.Marker({ position: currentLocation, map });
+                    }
+                    fetchPlaces();
+                } else {
+                    currentLocation = newPos;
+                    if (userMarker) userMarker.position = currentLocation;
+                    if (document.getElementById('cancel-nav-btn').style.display === 'inline-block') {
+                        map.panTo(currentLocation);
+                    }
+                }
+                saveLocation(currentLocation.lat, currentLocation.lng);
+            }, () => {
+                if (document.getElementById('loading-overlay')) document.getElementById('loading-overlay').classList.add('hidden');
+            }, { enableHighAccuracy: true });
+        } else {
+            if (document.getElementById('loading-overlay')) {
+                document.getElementById('loading-overlay').classList.add('hidden');
+            }
+            alert("Geolocation not supported by your browser.");
+        }
+        
+        document.querySelectorAll('.np-filter-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.np-filter-btn').forEach(b => b.classList.remove('active'));
+                const target = e.currentTarget;
+                target.classList.add('active');
+                currentCategory = target.getAttribute('data-type');
+                fetchPlaces();
+            });
+        });
+
+        // Inject pulse animation
+        const pulseStyle = document.createElement('style');
+        pulseStyle.textContent = '@keyframes pulse-user { 0% { transform: scale(1); opacity: 0.6; } 70% { transform: scale(2.5); opacity: 0; } 100% { transform: scale(1); opacity: 0; } }';
+        document.head.appendChild(pulseStyle);
+    }
+
+    function saveLocation(lat, lng) {
+        fetch("{% url 'save_location' %}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ latitude: lat, longitude: lng })
+        }).catch(e => console.error(e));
+    }
+
+    function centerMapOnUser() {
+        if (currentLocation && map) {
+            map.panTo(currentLocation);
+            map.setZoom(15);
+        }
+    }
+
+    function fetchPlaces() {
+        const searchLocation = currentLocation || map.getCenter();
+        if (!searchLocation) return;
+        
+        document.getElementById('loading-overlay').classList.remove('hidden');
+        document.getElementById('np-nearest-banner').style.display = 'none';
+        
+        // Clear old markers
+        markers.forEach(m => m.setMap(null));
+        markers = [];
+
+        const request = {
+            location: searchLocation,
+            radius: '5000',
+            type: CATEGORY_MAP[currentCategory]
+        };
+
+        placesService.nearbySearch(request, (results, status) => {
+            console.log("Places search status:", status);
+            document.getElementById('loading-overlay').classList.add('hidden');
+            const badge = document.getElementById('places-count');
+            
+            if (status !== google.maps.places.PlacesServiceStatus.OK || !results || results.length === 0) {
+                badge.textContent = '0 found';
+                badge.style.display = 'inline-block';
+                badge.className = 'badge bg-secondary ms-auto';
+                return;
+            }
+
+            badge.textContent = `${results.length} found`;
+            badge.style.display = 'inline-block';
+            badge.className = 'badge bg-primary ms-auto';
+
+            const bounds = new google.maps.LatLngBounds();
+            bounds.extend(currentLocation);
+
+            results.forEach(place => {
+                const pos = place.geometry.location;
+                const marker = new google.maps.Marker({
+                    position: pos,
+                    map: map,
+                    title: place.name
+                });
+
+                const dist = google.maps.geometry.spherical.computeDistanceBetween(
+                    new google.maps.LatLng(currentLocation.lat, currentLocation.lng),
+                    pos
+                );
+
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                            <button onclick="startNavigation(${pos.lat()}, ${pos.lng()})" style="display:inline-block; margin-top:8px; padding:6px 12px; background:#e22379; color:#fff; border:none; border-radius:4px; font-weight:600; cursor:pointer; width:100%;">
+                                <i class="bi bi-cursor-fill me-1"></i> View Route
+                            </button>
+                            <a href="https://www.google.com/maps/dir/?api=1&destination=${pos.lat()},${pos.lng()}&travelmode=walking" target="_blank" style="display:inline-block; margin-top:8px; padding:6px 12px; background:#4285F4; color:#fff; border:none; border-radius:4px; font-weight:600; cursor:pointer; width:100%; text-decoration:none; text-align:center;">
+                                <i class="bi bi-google me-1"></i> Open in Maps App
+                            </a>
+                        </div>
+                    `
+                });
+
+                marker.addListener("click", () => {
+                    infoWindow.open(map, marker);
+                });
+
+                markers.push(marker);
+                bounds.extend(pos);
+                place.dist = dist; // store for nearest
+            });
+
+            map.fitBounds(bounds, { padding: 50 });
+
+            // Sort and show nearest banner
+            results.sort((a, b) => a.dist - b.dist);
+            const nearest = results[0];
+            
+            document.getElementById('nearest-title').textContent = nearest.name;
+            document.getElementById('nearest-dist').textContent = (nearest.dist / 1000).toFixed(1) + " km";
+            document.getElementById('nearest-subtitle').textContent = "Tap to view turn-by-turn route";
+            document.getElementById('nearest-nav-btn').setAttribute('onclick', `startNavigation(${nearest.geometry.location.lat()}, ${nearest.geometry.location.lng()})`);
+            
+            // Add Maps App link to banner if helpful
+            const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${nearest.geometry.location.lat()},${nearest.geometry.location.lng()}&travelmode=walking`;
+            const banner = document.getElementById('np-nearest-banner');
+            if (!document.getElementById('banner-external-link')) {
+                const link = document.createElement('a');
+                link.id = 'banner-external-link';
+                link.href = mapsUrl;
+                link.target = "_blank";
+                link.className = "text-center small mt-2 text-primary text-decoration-none fw-bold";
+                link.innerHTML = '<i class="bi bi-box-arrow-up-right me-1"></i> Open in Maps App';
+                banner.appendChild(link);
+            } else {
+                document.getElementById('banner-external-link').href = mapsUrl;
+            }
+
+            document.getElementById('np-nearest-banner').style.display = 'flex';
+        });
+    }
+
+    function startNavigation(destLat, destLon) {
+        document.getElementById('np-filters').style.display = 'none';
+        document.getElementById('np-nearest-banner').style.display = 'none';
+        document.getElementById('cancel-nav-btn').style.display = 'inline-block';
+
+        const request = {
+            origin: currentLocation || map.getCenter(),
+            destination: { lat: destLat, lng: destLon },
+            travelMode: google.maps.TravelMode.WALKING
+        };
+
+        directionsService.route(request, (result, status) => {
+            if (status === 'OK') {
+                directionsRenderer.setDirections(result);
+            } else {
+                alert('Could not calculate route.');
+            }
+        });
+    }
+
+    function cancelNavigation() {
+        directionsRenderer.setDirections({routes: []});
+        document.getElementById('np-filters').style.display = 'flex';
+        document.getElementById('cancel-nav-btn').style.display = 'none';
+        if(document.getElementById('places-count').textContent !== '0') {
+            document.getElementById('np-nearest-banner').style.display = 'flex';
+        }
+        centerMapOnUser();
+    }
+
+    document.addEventListener('DOMContentLoaded', initMap);
+</script>
+{% endblock %}

@@ -1,0 +1,2 @@
+﻿--------- beginning of main
+06-12 11:53:18.163 I/adbd    ( 2516): adbd service requested 'shell,v2:export ANDROID_LOG_TAGS=''; exec logcat '-v' 'time' '-t' '75' '-e' 'Speech|Recogni|VoiceRecognition|ReactNativeJS|AudioRecord|google.*speech|NO_MATCH|ERROR_''

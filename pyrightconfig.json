@@ -1,0 +1,9 @@
+{
+    "pythonPath": "python",
+    "reportMissingImports": false,
+    "reportMissingModuleSource": false,
+    "analysis": {
+        "extraPaths": ["."],
+        "useLibraryCodeForTypes": true
+    }
+}

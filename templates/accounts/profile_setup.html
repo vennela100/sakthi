@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+
+{% block title %}Setup — Shakthi{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --notion-bg: #ffffff;
+        --notion-border: #edeeef;
+        --notion-text: #1a1a1a;
+        --notion-muted: #737373;
+        --notion-blue: #2383e2;
+        --notion-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    body {
+        background-color: #f7f7f8;
+        color: var(--notion-text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+
+    .setup-container {
+        max-width: 480px;
+        margin: 60px auto;
+        padding: 0 20px;
+    }
+
+    .setup-header {
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+    .setup-header h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    .setup-header p {
+        color: var(--notion-muted);
+        font-size: 1rem;
+    }
+
+    /* Step Indicator */
+    .notion-steps {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 2.5rem;
+    }
+    .notion-step-bar {
+        flex: 1;
+        height: 4px;
+        background: var(--notion-border);
+        border-radius: 2px;
+        position: relative;
+    }
+    .notion-step-bar.active { background: var(--notion-blue); }
+    .notion-step-bar.completed { background: var(--notion-text); }
+
+    /* Form Styling */
+    .form-label-notion {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--notion-muted);
+        margin-bottom: 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+    }
+    .form-control-notion {
+        width: 100%;
+        padding: 0.625rem 0.875rem;
+        border: 1px solid var(--notion-border);
+        border-radius: 8px;
+        font-size: 0.95rem;
+        color: var(--notion-text);
+        background: #fafafa;
+        transition: all 0.15s;
+        margin-bottom: 1.5rem;
+    }
+    .form-control-notion:focus {
+        background: white;
+        border-color: var(--notion-blue);
+        box-shadow: 0 0 0 3px rgba(35, 131, 226, 0.12);
+        outline: none;
+    }
+
+    .btn-notion-primary {
+        width: 100%;
+        background: var(--notion-blue);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.75rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.1s;
+    }
+    .btn-notion-secondary {
+        width: 100%;
+        background: white;
+        color: var(--notion-text);
+        border: 1px solid var(--notion-border);
+        border-radius: 8px;
+        padding: 0.75rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    /* Contact List */
+    .contact-card {
+        background: white;
+        border: 1px solid var(--notion-border);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: var(--notion-shadow);
+    }
+    .contact-card strong { display: block; font-size: 0.95rem; }
+    .contact-card span { font-size: 0.8rem; color: var(--notion-muted); }
+
+    .add-section {
+        background: #f1f1f2;
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="setup-container">
+    <div class="setup-header">
+        <h1>{% if step == 1 %}Profile details{% else %}Emergency contacts{% endif %}</h1>
+        <p>{% if step == 1 %}Help us personalize your safety experience.{% else %}Alert these people in case of emergency.{% endif %}</p>
+    </div>
+
+    <div class="notion-steps">
+        <div class="notion-step-bar {% if step == 1 %}active{% else %}completed{% endif %}"></div>
+        <div class="notion-step-bar {% if step == 2 %}active{% endif %}"></div>
+    </div>
+
+    <div class="animate-fade-in">
+        {% if step == 1 %}
+            <form method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                {% for field in form %}
+                    <div class="form-group">
+                        <label class="form-label-notion">{{ field.label }}</label>
+                        {{ field }}
+                    </div>
+                {% endfor %}
+                <button type="submit" class="btn-notion-primary">
+                    Continue to contacts
+                </button>
+            </form>
+
+        {% elif step == 2 %}
+            {% if contacts %}
+                <div class="mb-4">
+                    <label class="form-label-notion">Trusted network</label>
+                    {% for contact in contacts %}
+                        <div class="contact-card">
+                            <div>
+                                <strong>{{ contact.contact_name }}</strong>
+                                <span>{{ contact.relationship }} • {{ contact.phone_number }}</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-3">
+                                <i class="bi bi-check-circle-fill text-success"></i>
+                                <form method="POST" action="{% url 'delete_emergency_contact' contact.id %}" class="m-0 p-0 d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm text-danger border-0 bg-transparent p-0 m-0" title="Remove Contact" formnovalidate>
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <form method="POST">
+                {% csrf_token %}
+                <div class="add-section">
+                    <h6 class="mb-3 fw-bold">Add new contact</h6>
+                    {% for field in form %}
+                        <div class="form-group mb-3">
+                            <label class="form-label-notion">{{ field.label }}</label>
+                            {{ field }}
+                        </div>
+                    {% endfor %}
+                    <button type="submit" class="btn-notion-secondary">
+                        <i class="bi bi-plus-lg me-2"></i>Add to list
+                    </button>
+                </div>
+
+                <div class="d-flex gap-3">
+                    <a href="?step=1" class="btn-notion-secondary text-center text-decoration-none" style="flex: 1;">Back</a>
+                    <button type="submit" name="finish" class="btn-notion-primary" style="flex: 2;" formnovalidate {% if contacts.count < 1 %}disabled{% endif %}>
+                        Finish setup
+                    </button>
+                </div>
+                {% if contacts.count < 1 %}
+                    <p class="text-center text-danger small mt-3">
+                        <i class="bi bi-info-circle me-1"></i> Add at least 1 contact to proceed
+                    </p>
+                {% endif %}
+            </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
