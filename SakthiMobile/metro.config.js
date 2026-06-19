@@ -1,3 +1,4 @@
+const fs = require('fs');
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 
 /**
@@ -9,15 +10,11 @@ const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
  * @type {import('@react-native/metro-config').MetroConfig}
  */
 const projectRoot = __dirname;
+const realProjectRoot = fs.realpathSync(projectRoot);
 
 const config = {
-  watchFolders: [projectRoot],
-  watcher: {
-    // Use polling instead of native file watchers (fixes OneDrive issues)
-    watchman: {
-      enabled: false,
-    },
-  },
+  watchFolders:
+    realProjectRoot === projectRoot ? [projectRoot] : [projectRoot, realProjectRoot],
 };
 
 module.exports = mergeConfig(getDefaultConfig(__dirname), config);
