@@ -31,11 +31,11 @@ services:
         value: "False"
       # Must match the service's public hostname (update if the name changes).
       - key: ALLOWED_HOSTS
-        value: sakthi.onrender.com
+        value: sakthi-vqm2.onrender.com
       - key: CSRF_TRUSTED_ORIGINS
-        value: https://sakthi.onrender.com
+        value: https://sakthi-vqm2.onrender.com
       - key: SITE_URL
-        value: https://sakthi.onrender.com
+        value: https://sakthi-vqm2.onrender.com
       # ── Secrets: Render will prompt for these on first deploy ──
       - key: TWILIO_ACCOUNT_SID
         sync: false
