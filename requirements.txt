@@ -1,7 +1,7 @@
 # Backend dependencies for the Sakthi Django API.
 # Pinned to the versions verified in the development environment.
 
-Django==4.2.7
+Django>=4.2.16,<4.3
 djangorestframework==3.14.0
 djangorestframework-simplejwt==5.5.1
 django-allauth==65.15.0
