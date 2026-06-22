@@ -26,6 +26,16 @@ CSRF_TRUSTED_ORIGINS = [
     o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()
 ]
 
+# Render injects the service's public hostname here automatically, so the app
+# always trusts its own URL regardless of the random suffix Render assigns.
+_render_host = os.getenv('RENDER_EXTERNAL_HOSTNAME')
+if _render_host:
+    if _render_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_render_host)
+    _render_origin = f'https://{_render_host}'
+    if _render_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_render_origin)
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
