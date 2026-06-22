@@ -1,0 +1,28 @@
+name: Keep backend warm
+
+# Pings the Render free-tier backend so it never sleeps (Render spins a free
+# service down after ~15 min idle, causing a 30-60s cold start on the next
+# request). Keeping it warm makes sign-up/login instant for users & reviewers.
+
+on:
+  schedule:
+    # Every 10 minutes. GitHub may delay scheduled runs under load, but the
+    # app's own 90s auth timeout covers any occasional gap.
+    - cron: "*/10 * * * *"
+  # Allows running it manually from the Actions tab too.
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend
+        run: |
+          echo "Pinging Sakthi backend to keep it awake..."
+          # --max-time 90 tolerates a cold start; any HTTP response means it's up.
+          code=$(curl -sS --max-time 90 -o /dev/null -w "%{http_code}" https://sakthi-vqm2.onrender.com/ || echo "000")
+          echo "HTTP status: $code"
+          if [ "$code" = "000" ]; then
+            echo "No response (timed out)."; exit 1
+          fi
+          echo "Backend is awake."
