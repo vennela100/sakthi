@@ -7,12 +7,24 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-change-me-for-local-dev')
+SECRET_KEY = os.getenv('SECRET_KEY') or os.getenv(
+    'DJANGO_SECRET_KEY', 'django-insecure-change-me-for-local-dev'
+)
 
-DEBUG = True
+# Defaults to True for local dev; the hosting env (Render) sets DEBUG=False.
+DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = ['*']
-SITE_URL = 'http://192.168.1.6:8000'
+# '*' locally; in production set a comma-separated list of real hostnames.
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '*').split(',') if h.strip()]
+SITE_URL = os.getenv('SITE_URL', 'http://192.168.1.6:8000')
+
+# Render terminates TLS at a proxy and forwards the original scheme here.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Needed for admin/web POSTs over HTTPS in production (comma-separated origins).
+CSRF_TRUSTED_ORIGINS = [
+    o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -36,6 +48,7 @@ SITE_ID = 1
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -74,6 +87,13 @@ DATABASES = {
     }
 }
 
+# In production, DATABASE_URL (Render Postgres) overrides the local SQLite default.
+import dj_database_url
+
+_database_url = os.getenv('DATABASE_URL')
+if _database_url:
+    DATABASES['default'] = dj_database_url.parse(_database_url, conn_max_age=600)
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -88,6 +108,13 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# WhiteNoise serves the collected static files (incl. admin CSS) in production.
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'},
+}
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -184,3 +211,5 @@ MEDIA_ROOT = BASE_DIR / 'media'
 #   Project Settings → Service accounts → Generate new private key
 # Then place it at the project root (same folder as manage.py).
 FCM_SERVICE_ACCOUNT_KEY = BASE_DIR / 'serviceAccountKey.json'
+# On Render the key file is not committed; supply its JSON contents via env instead.
+FCM_SERVICE_ACCOUNT_JSON = os.getenv('FIREBASE_SERVICE_ACCOUNT_JSON', '')

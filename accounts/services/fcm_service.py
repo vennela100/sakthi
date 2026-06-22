@@ -31,19 +31,28 @@ def _get_firebase_app():
         return _firebase_app
 
     try:
+        import json
+
         import firebase_admin
         from firebase_admin import credentials
 
+        # Prefer the env-provided JSON (used on hosts like Render where the key
+        # file isn't committed); fall back to the local serviceAccountKey.json.
+        key_json = getattr(settings, 'FCM_SERVICE_ACCOUNT_JSON', '')
         key_path = getattr(settings, 'FCM_SERVICE_ACCOUNT_KEY', None)
-        if not key_path or not os.path.exists(str(key_path)):
+
+        if key_json:
+            cred = credentials.Certificate(json.loads(key_json))
+        elif key_path and os.path.exists(str(key_path)):
+            cred = credentials.Certificate(str(key_path))
+        else:
             logger.warning(
-                '[FCM] serviceAccountKey.json not found at %s. '
-                'FCM push notifications are disabled.',
+                '[FCM] No Firebase credentials found (FIREBASE_SERVICE_ACCOUNT_JSON '
+                'env var or serviceAccountKey.json at %s). Push notifications disabled.',
                 key_path,
             )
             return None
 
-        cred = credentials.Certificate(str(key_path))
         _firebase_app = firebase_admin.initialize_app(cred)
         logger.info('[FCM] Firebase Admin SDK initialised successfully.')
         return _firebase_app
