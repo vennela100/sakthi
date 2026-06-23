@@ -36,6 +36,22 @@ from accounts.services.location_service import LocationService
 from accounts.services.ai_service import AIService
 
 
+class HealthCheckAPIView(views.APIView):
+    """Lightweight, public, DB-free liveness probe.
+
+    Used by an external keep-warm pinger (and the app on launch) to wake the
+    free-tier server before a user signs in, so they never hit a 30-60s cold
+    start. Deliberately touches no database or external service so it stays
+    fast and can't fail while the rest of the stack is still booting.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        return Response({'status': 'ok'}, status=status.HTTP_200_OK)
+
+
 class EmailOrUsernameTokenObtainPairView(TokenObtainPairView):
     serializer_class = EmailOrUsernameTokenObtainPairSerializer
 

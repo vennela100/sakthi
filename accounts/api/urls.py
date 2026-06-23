@@ -8,6 +8,7 @@ from accounts.api.views import (
     StartTrackingSessionView, StopTrackingSessionView, TriggerSOSAPIView,
     RegisterFCMTokenView, EmailOrUsernameTokenObtainPairView, GeocodePlaceAPIView,
     AISafetyAssistantAPIView, GoogleLoginAPIView, RegisterAPIView,
+    HealthCheckAPIView,
 )
 
 router = DefaultRouter()
@@ -18,6 +19,10 @@ router.register(r'community-reports', CommunityReportViewSet, basename='api-comm
 router.register(r'danger-zones', DangerZoneViewSet, basename='api-danger-zones')
 
 urlpatterns = [
+    # Keep-warm / liveness probe (no auth, no DB) — hit by the external pinger
+    # and by the app on launch to pre-warm the free-tier server.
+    path('health/', HealthCheckAPIView.as_view(), name='api-health'),
+
     # JWT Authentication
     path('register/', RegisterAPIView.as_view(), name='api-register'),
     path('token/', EmailOrUsernameTokenObtainPairView.as_view(), name='token_obtain_pair'),

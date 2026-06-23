@@ -48,3 +48,14 @@ export const api = {
   geocodePlace: place =>
     axios.get(`${API_BASE_URL}/geocode-place/`, { params: { q: place } }),
 };
+
+// Fire-and-forget liveness ping. Called on app launch so the free-tier backend
+// starts waking from its cold start while the user is still on the splash/login
+// screen — by the time they tap Sign Up the server is usually already up.
+// Errors are swallowed: this is best-effort warming, never a blocker.
+export function prewarmBackend() {
+  axios
+    .get(`${API_BASE_URL}/health/`, { timeout: AUTH_TIMEOUT })
+    .then(() => console.log('[prewarm] backend awake'))
+    .catch(() => {});
+}

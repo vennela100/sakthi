@@ -5,6 +5,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import PowerButtonSOSHandler from './src/components/PowerButtonSOSHandler';
 import { GOOGLE_WEB_CLIENT_ID } from './src/config/api';
+import { prewarmBackend } from './src/services/ApiService';
 import { colors } from './src/theme';
 
 export default function App() {
@@ -13,6 +14,8 @@ export default function App() {
       webClientId: GOOGLE_WEB_CLIENT_ID,
       offlineAccess: false,
     });
+    // Wake the free-tier backend immediately so sign-in isn't blocked by a cold start.
+    prewarmBackend();
   }, []);
 
   return (
