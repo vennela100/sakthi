@@ -227,7 +227,10 @@ MEDIA_ROOT = BASE_DIR / 'media'
 USE_CLOUDINARY = bool(os.getenv('CLOUDINARY_URL'))
 if USE_CLOUDINARY:
     INSTALLED_APPS += ['cloudinary', 'cloudinary_storage']
-    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+    # Django 4.2 raises ImproperlyConfigured if DEFAULT_FILE_STORAGE is set while
+    # STORAGES is also defined (they're mutually exclusive). STORAGES is configured
+    # above for WhiteNoise, so route media uploads through its 'default' key instead.
+    STORAGES['default'] = {'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage'}
 
 # ── Firebase Cloud Messaging ──────────────────────────────────────────────────
 # Download this file from Firebase Console:
