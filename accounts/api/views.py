@@ -282,7 +282,10 @@ class TriggerSOSAPIView(views.APIView):
         # Dynamic base URL for the tracking link
         base_url = getattr(settings, 'SITE_URL', request.build_absolute_uri('/')[:-1]).rstrip('/')
         tracking_url = f"{base_url}/track/{token}/"
-        evidence_url = f"{base_url}{sos.image.url}" if sos.image else None
+        # Use the shared helper: with Cloudinary, sos.image.url is already an
+        # absolute https URL, so blindly prefixing base_url would produce a broken
+        # "...onrender.comhttps://res.cloudinary.com/..." link (NXDOMAIN).
+        evidence_url = SOSService._evidence_photo_url(sos, base_url)
 
         # Evidence may have failed to save (e.g. storage full) without failing the
         # SOS itself; the app uses this to warn the user.

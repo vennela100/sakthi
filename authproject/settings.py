@@ -35,6 +35,11 @@ if _render_host:
     _render_origin = f'https://{_render_host}'
     if _render_origin not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(_render_origin)
+    # The Render-assigned hostname is the authoritative public URL. Prefer it over
+    # any stale SITE_URL env var so SOS tracking/evidence links always point at the
+    # LIVE service — a wrong SITE_URL (e.g. an old onrender.com subdomain) sends
+    # contacts to a dead host ("APPLICATION LOADING" forever / NXDOMAIN).
+    SITE_URL = _render_origin
 
 INSTALLED_APPS = [
     'django.contrib.admin',
