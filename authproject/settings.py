@@ -212,9 +212,22 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
 # Google Maps API Key
 GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY', '')
 
-# Media Files (User uploads)
+# Media Files (User uploads — SOS evidence photos/audio)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Durable evidence storage.
+# Render's free disk is ephemeral: any uploaded photo is wiped on the next
+# deploy/restart, so by default SOS evidence would vanish. Set CLOUDINARY_URL
+# (cloudinary://<api_key>:<api_secret>@<cloud_name>) in the environment to push
+# uploads to Cloudinary instead — permanent public HTTPS URLs that work in the
+# SOS SMS link and survive deploys. Without it, files use local disk (fine for
+# local dev / short-lived demos). Gated on the env var so local `manage.py
+# check` never needs the cloudinary packages installed.
+USE_CLOUDINARY = bool(os.getenv('CLOUDINARY_URL'))
+if USE_CLOUDINARY:
+    INSTALLED_APPS += ['cloudinary', 'cloudinary_storage']
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 # ── Firebase Cloud Messaging ──────────────────────────────────────────────────
 # Download this file from Firebase Console:

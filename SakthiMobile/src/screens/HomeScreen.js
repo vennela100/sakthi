@@ -198,9 +198,19 @@ export default function HomeScreen({ navigation }) {
 
       Alert.alert(
         sosResult.offline ? 'Offline SOS sent' : 'SOS sent',
-        `${sosResult.sentCount}/${sosResult.totalCount} messages sent directly.${sosResult.firstFailure ? `\nIssue: ${sosResult.firstFailure}` : ''}${sosResult.backendIssue ? `\nBackend issue: ${sosResult.backendIssue}` : ''}\nTracking: ${sosResult.displayLink}${sosResult.evidenceUrl ? `\nEvidence: ${sosResult.evidenceUrl}` : pendingPhoto ? '\nEvidence: captured locally or upload unavailable' : '\nEvidence: automatic capture unavailable'}`,
+        `${sosResult.sentCount}/${sosResult.totalCount} messages sent directly.${sosResult.firstFailure ? `\nIssue: ${sosResult.firstFailure}` : ''}${sosResult.backendIssue ? `\nBackend issue: ${sosResult.backendIssue}` : ''}\nTracking: ${sosResult.displayLink}${sosResult.storageFull ? '\nEvidence: NOT saved — storage is full' : sosResult.evidenceUrl ? `\nEvidence: ${sosResult.evidenceUrl}` : pendingPhoto ? '\nEvidence: captured locally or upload unavailable' : '\nEvidence: automatic capture unavailable'}`,
         [{ text: 'Call 112', onPress: () => Linking.openURL('tel:112') }, { text: 'OK' }],
       );
+
+      // Surface a dedicated alert when evidence couldn't be stored because the
+      // media account is full, so it isn't missed in the SOS summary above.
+      if (sosResult.storageFull) {
+        Alert.alert(
+          'Storage is full',
+          'Your SOS was sent, but the evidence photo could not be saved because cloud storage is full. Free up space by deleting old evidence in More → SOS Evidence.',
+          [{ text: 'OK' }],
+        );
+      }
     } catch (error) {
       Alert.alert('SOS failed', error.response?.data?.detail || error.message);
     } finally {

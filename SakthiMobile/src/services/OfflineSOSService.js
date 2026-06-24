@@ -105,12 +105,17 @@ export async function sendOfflineCapableSOS({
   let trackingUrl = null;
   let evidenceUrl = null;
   let backendIssue = null;
+  let storageFull = false;
   let offline = false;
 
   try {
     const response = await createSosAlert(location, photo, imageName);
     trackingUrl = response.data.tracking_url || null;
     evidenceUrl = response.data.evidence_url || null;
+    // Backend saved the alert but the evidence photo couldn't be stored because
+    // the media account (Cloudinary) is out of space. SOS still went through.
+    storageFull = response.data.storage_full === true
+      || response.data.evidence_status === 'storage_full';
   } catch (error) {
     backendIssue = error.response?.data?.detail || error.message || 'Backend unavailable';
     offline = true;
@@ -136,6 +141,7 @@ export async function sendOfflineCapableSOS({
     totalCount: phoneList.length,
     firstFailure,
     backendIssue,
+    storageFull,
     offline,
     trackingUrl,
     evidenceUrl,

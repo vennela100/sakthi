@@ -18,15 +18,21 @@ class SOSService:
             is_active=False, deactivated_at=timezone.now()
         )
 
-        # Create new SOS alert with media
+        # Create the alert WITHOUT media first. Saving the evidence is what can
+        # hit the storage backend (e.g. a full Cloudinary account), and the
+        # life-safety parts of SOS — the alert record, the tracking session and
+        # the SMS to contacts — must never be blocked by a storage problem.
         sos = SOSAlert.objects.create(
             user=user,
             latitude=latitude,
             longitude=longitude,
-            image=image,
-            audio=audio,
             status='triggered'
         )
+
+        # Attach evidence separately and tolerate failures. `evidence_status` is a
+        # transient (non-DB) flag the API layer surfaces to the app so it can warn
+        # the user ("Storage is full") without the SOS itself failing.
+        sos.evidence_status = SOSService._attach_evidence(sos, image, audio)
 
         # 🚀 Start a secure tracking session linked to this SOS
         session = LocationService.start_tracking_session(user, sos_alert=sos)
@@ -36,6 +42,48 @@ class SOSService:
             SOSService.notify_emergency_contacts(sos, session.token)
         
         return sos, session.token
+
+    # Error-message fragments Cloudinary (and other backends) use when an account
+    # is over its storage / usage / plan quota. Matching any of these classifies
+    # the failure as "storage full" rather than a generic upload error.
+    _STORAGE_FULL_MARKERS = ('limit', 'quota', 'exceed', 'storage', 'usage', 'plan')
+
+    @staticmethod
+    def _attach_evidence(sos, image, audio):
+        """Saves SOS evidence media, tolerating storage failures.
+
+        Returns one of: 'none' (nothing to attach), 'ok', 'storage_full', or
+        'upload_failed'. On failure the media fields are left empty so the alert
+        record stays clean and the rest of the SOS flow can continue.
+        """
+        if not image and not audio:
+            return 'none'
+        try:
+            if image:
+                sos.image = image
+            if audio:
+                sos.audio = audio
+            sos.save(update_fields=['image', 'audio'])
+            return 'ok'
+        except Exception as e:
+            # Roll back any partially-set file references.
+            sos.image = None
+            sos.audio = None
+            try:
+                sos.save(update_fields=['image', 'audio'])
+            except Exception:
+                pass
+            status = SOSService._classify_storage_error(e)
+            logger.error('[SOS] Evidence upload failed (%s): %s', status, e)
+            return status
+
+    @staticmethod
+    def _classify_storage_error(exc):
+        """Maps a storage exception to 'storage_full' or generic 'upload_failed'."""
+        message = str(exc).lower()
+        if any(marker in message for marker in SOSService._STORAGE_FULL_MARKERS):
+            return 'storage_full'
+        return 'upload_failed'
 
     @staticmethod
     def notify_emergency_contacts(sos, token):
@@ -56,15 +104,23 @@ class SOSService:
         base_url = getattr(settings, 'SITE_URL', 'http://192.168.1.6:8000').rstrip('/')
         tracking_url = f"{base_url}/track/{token}/"
 
+        # Resolve a publicly reachable link to the captured evidence photo, if any.
+        # SMS can't attach images, so contacts get a tappable link instead. With
+        # Cloudinary storage `.url` is already an absolute https URL; with local
+        # disk storage it's a relative /media/... path that needs the site prefix.
+        evidence_url = SOSService._evidence_photo_url(sos, base_url)
+
         # 1. Send FCM push notifications (to contacts who have the app installed)
         fcm_count = FCMService.notify_contacts_via_fcm(sos, tracking_url)
         logger.info('[SOS] FCM push sent to %d contact(s).', fcm_count)
 
         # 2. Send Twilio SMS (covers contacts who don't have the app)
+        evidence_line = f"Evidence photo: {evidence_url}\n" if evidence_url else ""
         sms_body = (
             f"🚨 EMERGENCY ALERT 🚨\n"
             f"{display_name} is in DANGER!\n"
             f"Live Tracking: {tracking_url}\n"
+            f"{evidence_line}"
             f"Call 112 immediately! - Sakthi Safety"
         )
 
@@ -93,6 +149,20 @@ class SOSService:
             if fcm_count == 0:
                 sos.failure_reason = "No FCM tokens and no Twilio credentials."
             sos.save()
+
+    @staticmethod
+    def _evidence_photo_url(sos, base_url):
+        """Returns an absolute, publicly reachable URL for the SOS evidence photo, or None."""
+        if not getattr(sos, 'image', None):
+            return None
+        try:
+            url = sos.image.url
+        except Exception as e:
+            logger.warning(f"Could not resolve SOS evidence URL: {str(e)}")
+            return None
+        if url.startswith('http://') or url.startswith('https://'):
+            return url
+        return f"{base_url}{url if url.startswith('/') else '/' + url}"
 
     @staticmethod
     def _send_sms(client, from_phone, to_phone, body):

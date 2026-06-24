@@ -6,23 +6,37 @@ name: Keep backend warm
 
 on:
   schedule:
-    # Every 10 minutes. GitHub may delay scheduled runs under load, but the
-    # app's own 90s auth timeout covers any occasional gap.
-    - cron: "*/10 * * * *"
+    # GitHub heavily throttles scheduled workflows (observed: every 2-4h, not
+    # the requested interval). A single ping that infrequently can't keep a
+    # free Render service warm (it sleeps after ~15 min idle). So instead of
+    # one ping per run, each run *loops*, pinging every 5 min for ~5.5h — long
+    # enough to bridge the gaps between GitHub's sparse scheduled runs.
+    - cron: "*/30 * * * *"
   # Allows running it manually from the Actions tab too.
   workflow_dispatch:
+
+# Don't cancel a running keep-warm loop when a new scheduled run starts; let the
+# fresh run queue/overlap so coverage is continuous rather than interrupted.
+concurrency:
+  group: keep-warm
+  cancel-in-progress: false
 
 jobs:
   ping:
     runs-on: ubuntu-latest
+    # GitHub's hard job cap is 6h; stop comfortably short of it.
+    timeout-minutes: 340
     steps:
-      - name: Ping backend
+      - name: Keep backend awake (self-pinging loop)
         run: |
-          echo "Pinging Sakthi backend to keep it awake..."
-          # --max-time 90 tolerates a cold start; any HTTP response means it's up.
-          code=$(curl -sS --max-time 90 -o /dev/null -w "%{http_code}" https://sakthi-vqm2.onrender.com/ || echo "000")
-          echo "HTTP status: $code"
-          if [ "$code" = "000" ]; then
-            echo "No response (timed out)."; exit 1
-          fi
-          echo "Backend is awake."
+          URL="https://sakthi-vqm2.onrender.com/"
+          DURATION=$((330 * 60))   # run the loop for ~5.5 hours
+          INTERVAL=300             # ping every 5 min (Render sleeps after ~15)
+          end=$(( $(date +%s) + DURATION ))
+          while [ "$(date +%s)" -lt "$end" ]; do
+            # --max-time 90 tolerates a cold start; any HTTP response means it's up.
+            code=$(curl -sS --max-time 90 -o /dev/null -w "%{http_code}" "$URL" || echo "000")
+            echo "$(date -u +%H:%M:%S) HTTP $code"
+            sleep "$INTERVAL"
+          done
+          echo "Keep-warm loop finished."

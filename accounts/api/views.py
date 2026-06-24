@@ -1,6 +1,7 @@
 import base64
 import binascii
 import json
+import logging
 import math
 from datetime import timedelta
 from django.utils import timezone
@@ -34,6 +35,8 @@ from accounts.api.serializers import (
 from accounts.services.sos_service import SOSService
 from accounts.services.location_service import LocationService
 from accounts.services.ai_service import AIService
+
+logger = logging.getLogger(__name__)
 
 
 class HealthCheckAPIView(views.APIView):
@@ -212,14 +215,24 @@ class SOSViewSet(viewsets.ModelViewSet):
         for field_name in ('image', 'audio'):
             media_file = getattr(sos, field_name)
             if media_file:
-                media_file.delete(save=False)
+                # .delete() routes to the storage backend — for Cloudinary this
+                # calls its destroy() API, freeing the space. Surface a failure
+                # instead of silently leaving the file orphaned in storage.
+                try:
+                    media_file.delete(save=False)
+                except Exception as e:
+                    logger.warning('Failed to delete %s for SOS %s: %s', field_name, sos.pk, e)
+                    return Response(
+                        {'detail': f'Could not remove {field_name} from storage: {e}'},
+                        status=status.HTTP_502_BAD_GATEWAY,
+                    )
                 setattr(sos, field_name, None)
                 deleted = True
 
         if deleted:
             sos.save(update_fields=['image', 'audio'])
 
-        return Response({'status': 'Evidence deleted successfully.'})
+        return Response({'status': 'Evidence deleted successfully.', 'deleted': deleted})
 
 
 class TriggerSOSAPIView(views.APIView):
@@ -271,12 +284,18 @@ class TriggerSOSAPIView(views.APIView):
         tracking_url = f"{base_url}/track/{token}/"
         evidence_url = f"{base_url}{sos.image.url}" if sos.image else None
 
+        # Evidence may have failed to save (e.g. storage full) without failing the
+        # SOS itself; the app uses this to warn the user.
+        evidence_status = getattr(sos, 'evidence_status', 'ok')
+
         return Response({
             'status': 'SOS triggered successfully',
             'sos_id': sos.id,
             'token': str(token),
             'tracking_url': tracking_url,
             'evidence_url': evidence_url,
+            'evidence_status': evidence_status,
+            'storage_full': evidence_status == 'storage_full',
         })
 
 
