@@ -2,16 +2,14 @@ name: Keep backend warm
 
 # Pings the Render free-tier backend so it never sleeps (Render spins a free
 # service down after ~15 min idle, causing a 30-60s cold start on the next
-# request). Keeping it warm makes sign-up/login instant for users & reviewers.
+# request). Keeping it warm makes sign-up/login instant for users and reviewers.
 
 on:
   schedule:
-    # GitHub heavily throttles scheduled workflows (observed: every 2-4h, not
-    # the requested interval). A single ping that infrequently can't keep a
-    # free Render service warm (it sleeps after ~15 min idle). So instead of
-    # one ping per run, each run *loops*, pinging every 5 min for ~5.5h — long
-    # enough to bridge the gaps between GitHub's sparse scheduled runs.
-    - cron: "*/30 * * * *"
+    # Each run loops for ~5.5h, pinging every 5 min. Starting a new run every
+    # 5h keeps coverage continuous without creating a large queue of scheduled
+    # runs that GitHub cancels under the concurrency group.
+    - cron: "0 */5 * * *"
   # Allows running it manually from the Actions tab too.
   workflow_dispatch:
 
