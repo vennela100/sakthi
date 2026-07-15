@@ -4,13 +4,45 @@ Sakthi is a personal safety and emergency response project with a Django backend
 
 ## Project Structure
 
-- `authproject/` - Django project settings and root URL configuration.
-- `accounts/` - Django app for users, SOS events, contacts, reports, tracking, REST APIs, and service-layer logic.
-- `templates/` - Server-rendered Django pages for the web experience.
-- `static/` and `media/` - Static assets and local media uploads.
-- `SakthiMobile/` - React Native mobile app that consumes the Django REST API.
-- `.github/workflows/keep-warm.yml` - Scheduled GitHub Action that pings the deployed backend.
-- `render.yaml` - Render deployment blueprint for the backend.
+```text
+sakthi/
+├── .github/
+│   └── workflows/
+│       └── keep-warm.yml          # GitHub Action that keeps the Render backend awake
+├── accounts/                      # Main Django app
+│   ├── api/                       # Django REST Framework serializers, views, and API URLs
+│   ├── management/commands/       # Custom Django management commands
+│   ├── migrations/                # Database migrations
+│   ├── services/                  # SOS, location, AI, safety, and FCM business logic
+│   ├── forms.py                   # Web forms for auth, contacts, profile, and reports
+│   ├── models.py                  # CustomUser, SOSAlert, contacts, reports, tracking models
+│   ├── urls.py                    # Server-rendered web routes
+│   └── views.py                   # Django web views
+├── authproject/                   # Django project configuration
+│   ├── settings.py                # Installed apps, database, auth, REST, media, integrations
+│   ├── urls.py                    # Root URL routing
+│   └── wsgi.py                    # WSGI entry point for deployment
+├── media/                         # Local uploaded media during development
+├── static/                        # Static assets
+├── templates/                     # Django HTML templates
+│   └── accounts/                  # Web pages for login, dashboard, tracking, reports, etc.
+├── SakthiMobile/                  # React Native mobile app
+│   ├── android/                   # Android native project and Gradle config
+│   ├── ios/                       # iOS native project
+│   ├── src/
+│   │   ├── components/            # Shared React Native UI components
+│   │   ├── config/                # API base URL and OAuth client config
+│   │   ├── context/               # Auth context and token persistence
+│   │   ├── navigation/            # App navigation
+│   │   ├── screens/               # Mobile app screens
+│   │   └── services/              # API, FCM, offline SOS, and helper services
+│   ├── App.js                     # Mobile app root component
+│   └── package.json               # Mobile dependencies and scripts
+├── manage.py                      # Django command-line entry point
+├── requirements.txt               # Backend Python dependencies
+├── render.yaml                    # Render backend deployment blueprint
+└── README.md                      # Project documentation
+```
 
 ## Main Features
 
